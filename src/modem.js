@@ -600,6 +600,40 @@ class AtModem {
     return { ok: true, status: this.status(), messages: this.messages() };
   }
 
+  deleteMessages(items) {
+    return this._enqueue(() => this._deleteMessagesLocked(items));
+  }
+
+  async _deleteMessagesLocked(items) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) throw new Error('未选择要删除的短信');
+
+    // Expand concat indexes; group by storage to minimize CPMS switches.
+    const byStorage = new Map();
+    for (const it of list) {
+      const stor = String(it?.storage || 'SM').toUpperCase();
+      const indexes = String(it?.index ?? '')
+        .split('+')
+        .map((s) => s.trim())
+        .filter((s) => /^\d+$/.test(s))
+        .map((s) => parseInt(s, 10));
+      if (!indexes.length) continue;
+      if (!byStorage.has(stor)) byStorage.set(stor, new Set());
+      for (const idx of indexes) byStorage.get(stor).add(idx);
+    }
+    if (!byStorage.size) throw new Error('无效的短信索引');
+
+    for (const [stor, idxSet] of byStorage) {
+      await this._command(`AT+CPMS="${stor}","${stor}","${stor}"`);
+      for (const idx of [...idxSet].sort((a, b) => a - b)) {
+        await this._command(`AT+CMGD=${idx}`, { timeout: 10000 });
+      }
+    }
+    await this._refreshLocked();
+    return { ok: true, status: this.status(), messages: this.messages() };
+  }
+
   deleteAll({ storage } = {}) {
     return this._enqueue(() => this._deleteAllLocked(storage));
   }

@@ -502,10 +502,29 @@ input:focus {
 
 .msg {
   display: grid;
-  grid-template-columns: minmax(140px, 200px) 1fr auto;
-  gap: 16px;
+  grid-template-columns: 28px minmax(120px, 180px) 1fr auto;
+  gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line-2);
+  align-items: start;
+}
+
+.msg-check {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+  cursor: pointer;
+}
+
+.msg-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #2563eb);
+}
+
+.btn-row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .msg:last-child { border-bottom: 0; }
@@ -564,7 +583,7 @@ input:focus {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  max-width: 280px;
+  max-width: min(520px, 100%);
 }
 
 
@@ -580,7 +599,8 @@ input:focus {
   .theme-toggle { font-size: 11px; padding: 8px 4px; }
   .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compose-row { grid-template-columns: 1fr; }
-  .msg { grid-template-columns: 1fr; gap: 6px; }
+  .msg { grid-template-columns: 28px 1fr; gap: 6px; }
+  .msg-body, .msg-actions { grid-column: 1 / -1; }
   .msg-actions { justify-content: flex-start; }
   .panel-head-right { align-items: stretch; max-width: none; }
   .content, .topbar { padding-left: 16px; padding-right: 16px; }

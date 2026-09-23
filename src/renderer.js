@@ -6,22 +6,29 @@ const THEME_KEY = 'dji4g-toolkit-theme';
 const VIEW_META = {
   overview: { title: '模块概览', sub: '运营商 / 信号 / SIM / IMS 一览' },
   sms: { title: '短信', sub: 'PDU 收发 · SM / ME / MT · +CMTI 监听' },
-  drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 需 UAC' },
+  drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC' },
   diag: { title: '诊断', sub: 'USB / AT 口 / ATI · IMS 启用' },
 };
 
 let refreshTimer = null;
 let busy = false;
 let lastStatus = null;
+/** @type {Set<string>} */
+let selectedSmsKeys = new Set();
+let lastMessages = [];
 
 function setBusy(isBusy) {
   busy = isBusy;
   for (const id of [
     'btnDrivers',
+    'btnDriversWwan',
     'btnDetect',
     'btnSmsRefresh',
     'btnSmsReconnect',
     'btnSend',
+    'btnSmsSelectAll',
+    'btnSmsSelectNone',
+    'btnSmsDeleteSelected',
     'btnSmsClearSm',
     'btnEnableIms',
     'btnEnableImsReboot',
@@ -176,16 +183,27 @@ function setSmsStatus(s, ok) {
   }
 }
 
+function msgKey(m) {
+  return `${m.storage || 'SM'}:${m.index}`;
+}
+
 function renderMessages(msgs) {
   const box = $('smsList');
-  if (!msgs || !msgs.length) {
+  lastMessages = Array.isArray(msgs) ? msgs.slice() : [];
+  // Drop selections that no longer exist
+  const alive = new Set(lastMessages.filter((m) => m.index != null && m.index !== '').map(msgKey));
+  for (const k of [...selectedSmsKeys]) {
+    if (!alive.has(k)) selectedSmsKeys.delete(k);
+  }
+
+  if (!lastMessages.length) {
     box.innerHTML =
       '<div class="inbox-empty">暂无短信<br><span style="font-size:12px;opacity:.85">PDU 列表为空时多为网络 / IMS / SIM 侧未投递</span></div>';
     return;
   }
 
   box.textContent = '';
-  for (const m of msgs) {
+  for (const m of lastMessages) {
     const concat =
       m.concat && m.concat.reassembled
         ? ` · 长短信 ${m.concat.seq || ''}/${m.concat.total}`
@@ -193,8 +211,23 @@ function renderMessages(msgs) {
           ? ` · 分段 ${m.concat.seq}/${m.concat.total}`
           : '';
 
+    const key = msgKey(m);
+    const canSelect = m.index != null && m.index !== '';
+
     const row = document.createElement('article');
     row.className = 'msg';
+
+    const checkWrap = document.createElement('label');
+    checkWrap.className = 'msg-check';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.disabled = !canSelect;
+    cb.checked = canSelect && selectedSmsKeys.has(key);
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedSmsKeys.add(key);
+      else selectedSmsKeys.delete(key);
+    });
+    checkWrap.appendChild(cb);
 
     const side = document.createElement('div');
     side.className = 'msg-side';
@@ -221,15 +254,26 @@ function renderMessages(msgs) {
     delBtn.className = 'btn tiny danger-ghost';
     delBtn.textContent = '删除';
     delBtn.title = '从模组存储删除此条';
-    delBtn.disabled = m.index == null || m.index === '';
+    delBtn.disabled = !canSelect;
     delBtn.addEventListener('click', () => deleteOneMessage(m));
     actions.appendChild(delBtn);
 
+    row.appendChild(checkWrap);
     row.appendChild(side);
     row.appendChild(body);
     row.appendChild(actions);
     box.appendChild(row);
   }
+}
+
+function selectedItems() {
+  const map = new Map(lastMessages.filter((m) => m.index != null && m.index !== '').map((m) => [msgKey(m), m]));
+  const items = [];
+  for (const k of selectedSmsKeys) {
+    const m = map.get(k);
+    if (m) items.push({ storage: m.storage || 'SM', index: m.index });
+  }
+  return items;
 }
 
 async function deleteOneMessage(m) {
@@ -243,10 +287,37 @@ async function deleteOneMessage(m) {
   try {
     const result = await window.toolkit.smsDelete(m.storage || 'SM', m.index);
     if (!result.ok) throw new Error(result.error || '删除失败');
+    selectedSmsKeys.delete(msgKey(m));
     setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
     renderMessages(result.messages || []);
   } catch (e) {
     setSmsStatus('删除失败: ' + (e.message || e), false);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function deleteSelectedMessages() {
+  const items = selectedItems();
+  if (!items.length) {
+    setSmsStatus('请先勾选要删除的短信', false);
+    switchView('sms');
+    return;
+  }
+  const ok = window.confirm(
+    `确定删除所选 ${items.length} 条短信？\n将对每条执行 AT+CMGD（按存储切换 CPMS）。\n此操作不可恢复。`
+  );
+  if (!ok) return;
+  setBusy(true);
+  setSmsStatus(`正在删除所选 ${items.length} 条…`);
+  try {
+    const result = await window.toolkit.smsDeleteMany(items);
+    if (!result.ok) throw new Error(result.error || '批量删除失败');
+    selectedSmsKeys.clear();
+    setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
+    renderMessages(result.messages || []);
+  } catch (e) {
+    setSmsStatus('批量删除失败: ' + (e.message || e), false);
   } finally {
     setBusy(false);
   }
@@ -301,10 +372,30 @@ async function init() {
 
   $('btnDrivers').onclick = async () => {
     const log = $('driverLog');
-    appendLog(log, '=== 一键安装驱动（需要管理员 UAC）===');
+    appendLog(log, '=== 一键安装驱动（qcser/qcmdm/qcfilter，需要管理员 UAC）===');
     setBusy(true);
     try {
       const result = await window.toolkit.installDrivers();
+      appendLog(log, result.message || JSON.stringify(result));
+      appendLog(log, result.ok ? '成功' : '失败或已取消');
+    } catch (e) {
+      appendLog(log, String(e.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnDriversWwan').onclick = async () => {
+    const ok = window.confirm(
+      '将安装上网驱动 qcwwan.inf（Quectel NDIS WWAN）。\n\n可能覆盖已有的百旺/大疆 WWAN 网卡驱动；若当前已能上网可跳过。\n\n需要管理员 UAC。是否继续？'
+    );
+    if (!ok) return;
+    const log = $('driverLog');
+    appendLog(log, '=== 安装上网驱动 qcwwan（需要管理员 UAC）===');
+    appendLog(log, '警告：可能覆盖已有百旺/大疆 WWAN 驱动；已能上网则可跳过。');
+    setBusy(true);
+    try {
+      const result = await window.toolkit.installWwanDriver();
       appendLog(log, result.message || JSON.stringify(result));
       appendLog(log, result.ok ? '成功' : '失败或已取消');
     } catch (e) {
@@ -387,6 +478,21 @@ async function init() {
       setBusy(false);
     }
   };
+
+  $('btnSmsSelectAll').onclick = () => {
+    for (const m of lastMessages) {
+      if (m.index == null || m.index === '') continue;
+      selectedSmsKeys.add(msgKey(m));
+    }
+    renderMessages(lastMessages);
+  };
+
+  $('btnSmsSelectNone').onclick = () => {
+    selectedSmsKeys.clear();
+    renderMessages(lastMessages);
+  };
+
+  $('btnSmsDeleteSelected').onclick = () => deleteSelectedMessages();
 
   $('btnSmsClearSm').onclick = async () => {
     const ok = window.confirm(

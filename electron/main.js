@@ -66,6 +66,8 @@ ipcMain.handle('app:getInfo', async () => ({
 
 ipcMain.handle('driver:install', async () => launchElevatedInstall());
 
+ipcMain.handle('driver:installWwan', async () => launchElevatedInstall({ wwanOnly: true }));
+
 ipcMain.handle('device:detect', async (_evt, opts) => detectStatus(opts || { probe: true }));
 
 ipcMain.handle('sms:status', async () => modem.status());
@@ -91,6 +93,20 @@ ipcMain.handle('sms:delete', async (_evt, payload) => {
       storage: payload?.storage,
       index: payload?.index,
     });
+    return { ok: true, ...result };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      status: modem.status(),
+      messages: modem.messages(),
+    };
+  }
+});
+
+ipcMain.handle('sms:deleteMany', async (_evt, payload) => {
+  try {
+    const result = await modem.deleteMessages(payload?.items || []);
     return { ok: true, ...result };
   } catch (err) {
     return {

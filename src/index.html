@@ -105,7 +105,12 @@
               </div>
               <div class="panel-head-right">
                 <p class="panel-note">约每 15 秒自动刷新；不会在读取时自动删除</p>
-                <button type="button" class="btn ghost danger-ghost" id="btnSmsClearSm">清空当前存储 (SM)</button>
+                <div class="btn-row wrap">
+                  <button type="button" class="btn ghost" id="btnSmsSelectAll">全选</button>
+                  <button type="button" class="btn ghost" id="btnSmsSelectNone">取消全选</button>
+                  <button type="button" class="btn ghost danger-ghost" id="btnSmsDeleteSelected">删除所选</button>
+                  <button type="button" class="btn ghost danger-ghost" id="btnSmsClearSm">清空当前存储 (SM)</button>
+                </div>
               </div>
             </div>
             <div id="smsList" class="inbox" aria-live="polite"></div>
@@ -113,16 +118,23 @@
         </section>
 
         <!-- Drivers -->
-        <section class="view" id="view-drivers" data-title="驱动" data-sub="Quectel qcser / qcmdm / qcfilter · 需 UAC">
+        <section class="view" id="view-drivers" data-title="驱动" data-sub="Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC">
           <div class="panel">
             <div class="panel-head">
               <div>
                 <p class="kicker">WINDOWS DRIVERS</p>
                 <h2>一键安装</h2>
               </div>
-              <button type="button" class="btn primary" id="btnDrivers">一键安装驱动</button>
+              <div class="btn-row wrap">
+                <button type="button" class="btn primary" id="btnDrivers">一键安装驱动</button>
+                <button type="button" class="btn warn" id="btnDriversWwan">安装上网驱动 (qcwwan)</button>
+              </div>
             </div>
-            <p class="muted-line">安装 qcser / qcmdm / qcfilter（默认不装 qcwwan）。建议顺序：安装驱动 → 检测模块 → 使用短信。</p>
+            <p class="muted-line">「一键安装驱动」仅装 qcser / qcmdm / qcfilter（串口 AT/DM/filter）。建议顺序：安装驱动 → 检测模块 → 使用短信。</p>
+            <div class="hint-card warn">
+              <strong>上网驱动说明</strong>
+              <p>仓库内无单独的「大疆官方」上网驱动包；本模块实用的 WWAN/NDIS 上网驱动即捆绑的 <code>qcwwan.inf</code>（含 ndis sys）。点击「安装上网驱动」会以管理员权限仅安装 qcwwan。<strong>可能覆盖已有的百旺/大疆 WWAN 网卡驱动；若当前已能上网可跳过。</strong></p>
+            </div>
             <pre id="driverLog" class="console" aria-live="polite">就绪。点击上方按钮开始安装。</pre>
           </div>
         </section>

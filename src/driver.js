@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -11,6 +11,7 @@ const { app } = require('electron');
 const execFileAsync = promisify(execFile);
 
 const INSTALL_INFS = ['qcser.inf', 'qcmdm.inf', 'qcfilter.inf'];
+const WWAN_INF = 'qcwwan.inf';
 const TEMP_DIR_NAME = 'dji-4g-toolkit-drivers';
 
 function isPackaged() {
@@ -38,7 +39,7 @@ function installScriptPath() {
   return path.join(projectRoot(), 'scripts', 'Install-Drivers.ps1');
 }
 
-async function prepareDriverTree() {
+async function prepareDriverTree({ requireWwan = false } = {}) {
   const src = driversWindows10Dir();
   if (!fs.existsSync(src) || !fs.statSync(src).isDirectory()) {
     throw new Error(`Bundled drivers not found: ${src}`);
@@ -46,6 +47,10 @@ async function prepareDriverTree() {
   for (const inf of INSTALL_INFS) {
     const p = path.join(src, inf);
     if (!fs.existsSync(p)) throw new Error(`Missing required INF: ${p}`);
+  }
+  if (requireWwan) {
+    const p = path.join(src, WWAN_INF);
+    if (!fs.existsSync(p)) throw new Error(`Missing WWAN INF: ${p}`);
   }
 
   if (!isPackaged()) {
@@ -85,9 +90,13 @@ async function copyInstallScript(driverDir) {
 
 /**
  * Elevate Install-Drivers.ps1 with -DriverDir pointing at bundled windows10.
+ * opts: { includeWwan?: boolean, wwanOnly?: boolean }
  * Returns { ok, message, logPath, exitCode }.
  */
-async function launchElevatedInstall() {
+async function launchElevatedInstall(opts = {}) {
+  const includeWwan = !!(opts && opts.includeWwan);
+  const wwanOnly = !!(opts && opts.wwanOnly);
+
   if (process.platform !== 'win32') {
     return { ok: false, message: 'Driver install is Windows-only.', exitCode: -1 };
   }
@@ -95,14 +104,20 @@ async function launchElevatedInstall() {
   let driverDir;
   let script;
   try {
-    driverDir = await prepareDriverTree();
+    driverDir = await prepareDriverTree({ requireWwan: includeWwan || wwanOnly });
     script = await copyInstallScript(driverDir);
   } catch (err) {
     return { ok: false, message: String(err.message || err), exitCode: -1 };
   }
 
   const logPath = path.join(os.tmpdir(), 'dji-4g-toolkit-driver-install.log');
+  const modeLabel = wwanOnly
+    ? 'WWAN only (qcwwan.inf)'
+    : includeWwan
+      ? 'serial + WWAN'
+      : 'serial only (qcser/qcmdm/qcfilter)';
   const preamble = [
+    `Mode: ${modeLabel}`,
     `Drivers: ${driverDir}`,
     `Script: ${script}`,
     `Log file: ${logPath}`,
@@ -110,9 +125,21 @@ async function launchElevatedInstall() {
 
   // Escape single quotes for PowerShell single-quoted strings.
   const esc = (s) => String(s).replace(/'/g, "''");
+  const argList = [
+    "'-NoProfile'",
+    "'-ExecutionPolicy'",
+    "'Bypass'",
+    "'-File'",
+    `'${esc(script)}'`,
+    "'-DriverDir'",
+    `'${esc(driverDir)}'`,
+  ];
+  if (wwanOnly) argList.push("'-WwanOnly'");
+  else if (includeWwan) argList.push("'-IncludeWwan'");
+
   const ps = [
     `$p = Start-Process -FilePath 'powershell.exe'`,
-    `-ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','${esc(script)}','-DriverDir','${esc(driverDir)}')`,
+    `-ArgumentList @(${argList.join(',')})`,
     `-Verb RunAs -Wait -PassThru;`,
     `exit $p.ExitCode`,
   ].join(' ');
@@ -171,6 +198,7 @@ function resourcePaths() {
 
 module.exports = {
   INSTALL_INFS,
+  WWAN_INF,
   prepareDriverTree,
   launchElevatedInstall,
   resourcePaths,

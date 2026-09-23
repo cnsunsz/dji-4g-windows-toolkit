@@ -10,8 +10,12 @@ with, endorsed by, or sponsored by DJI or Quectel**.
 ## Quectel Windows USB Drivers (bundled)
 
 - **What:** Quectel NDIS Windows USB Driver (Q) **V2.6.0** `windows10/` tree
-  (`qcser.inf`, `qcmdm.inf`, `qcfilter.inf`, and related `.sys` / `.cat` binaries;
-  `qcwwan.inf` may be present in the tree but is **not** installed by default).
+  (`qcser.inf`, `qcmdm.inf`, `qcfilter.inf`, related `.sys` / `.cat`, plus optional
+  `qcwwan.inf` + `ndis/` for WWAN/internet). There is **no** separate official
+  DJI-branded internet-driver package in this repo; the practical WWAN stack for
+  this Quectel/Baiwang module is **qcwwan**. Default one-click install still
+  installs **only** serial trio; UI / `-WwanOnly` can install `qcwwan` explicitly
+  (may replace an existing Baiwang/DJI WWAN adapter driver).
 - **Source (community mirror used for convenience):**
   `https://raw.githubusercontent.com/4IceG/RM520N-GL/main/Toolz/Quectel_Windows_USB_Driver(Q)_NDIS_V2.6.0.zip`
 - **Rights:** Proprietary to **Quectel Wireless Solutions Co., Ltd.** (and/or its

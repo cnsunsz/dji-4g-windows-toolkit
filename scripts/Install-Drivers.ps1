@@ -1,13 +1,19 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Install Quectel qcser / qcmdm / qcfilter drivers for DJI 4G (QDC507).
+  Install Quectel drivers for DJI 4G (QDC507).
+.DESCRIPTION
+  Default: qcser / qcmdm / qcfilter (serial AT/DM/filter).
+  -IncludeWwan : also install qcwwan.inf (NDIS WWAN / internet).
+  -WwanOnly    : install only qcwwan.inf (skip serial trio).
 .NOTES
-  Skips qcwwan.inf by default to avoid replacing a working Baiwang WWAN stack.
+  qcwwan may replace an existing Baiwang/DJI WWAN stack — use only when needed.
   Exit 0 on success. Log: %TEMP%\dji-4g-toolkit-driver-install.log
 #>
 param(
-    [string]$DriverDir = ""
+    [string]$DriverDir = "",
+    [switch]$IncludeWwan,
+    [switch]$WwanOnly
 )
 
 $ErrorActionPreference = "Continue"
@@ -20,6 +26,7 @@ function Write-Log([string]$Message) {
 }
 
 Write-Log "=== DJI 4G Toolkit driver install start ==="
+Write-Log ("IncludeWwan={0} WwanOnly={1}" -f [bool]$IncludeWwan, [bool]$WwanOnly)
 
 if (-not $DriverDir) {
     $here = $PSScriptRoot
@@ -43,8 +50,15 @@ if (-not $DriverDir -or -not (Test-Path -LiteralPath $DriverDir)) {
     exit 1
 }
 
-# AT / DM / filter only — do not install qcwwan unless explicitly needed.
-$infs = @("qcser.inf", "qcmdm.inf", "qcfilter.inf")
+if ($WwanOnly) {
+    $infs = @("qcwwan.inf")
+} elseif ($IncludeWwan) {
+    $infs = @("qcser.inf", "qcmdm.inf", "qcfilter.inf", "qcwwan.inf")
+} else {
+    # AT / DM / filter only — do not install qcwwan unless explicitly requested.
+    $infs = @("qcser.inf", "qcmdm.inf", "qcfilter.inf")
+}
+
 $failed = 0
 
 foreach ($inf in $infs) {
