@@ -74,6 +74,17 @@ class AtModem {
     this._cmtiQueue = [];
     this._onUrc = null;
     this._dataHandler = null;
+    // Voice / call (experimental)
+    this._callState = 'idle'; // idle | dialing | ringing | active | ending
+    this._callNumber = null;
+    this._callClip = null;
+    this._callLog = [];
+    this._usbcfgRaw = null;
+    this._usbcfgUac = null;
+    this._usbcfgPrev = null;
+    this._qpcmvOk = null;
+    this._qpcmvError = null;
+    this._lastUssd = null;
   }
 
   setUrcHandler(fn) {
@@ -92,7 +103,8 @@ class AtModem {
       port: this._port,
       signal: this._signal,
       operator: this._operator,
-      ownNumber: this._ownNumber,
+      ownNumber: this._ownNumber, // CNUM only; may be empty on CMCC
+      cnum: this._ownNumber,
       iccid: this._iccid,
       imsi: this._imsi,
       csca: this._csca,
@@ -100,6 +112,16 @@ class AtModem {
       cereg: this._cereg,
       imsEnable: this._imsEnable,
       imsRegistered: this._imsRegistered,
+      callState: this._callState,
+      callNumber: this._callNumber,
+      callClip: this._callClip,
+      callLog: this._callLog.slice(-40),
+      usbcfgRaw: this._usbcfgRaw,
+      usbcfgUac: this._usbcfgUac,
+      usbcfgPrev: this._usbcfgPrev,
+      qpcmvOk: this._qpcmvOk,
+      qpcmvError: this._qpcmvError,
+      lastUssd: this._lastUssd,
       error: this._error,
       atHint: AT_PORT_HINT,
       mode: 'PDU',
@@ -148,30 +170,112 @@ class AtModem {
     this._serial.on('data', this._dataHandler);
   }
 
-  _drainUrcs() {
-    // Pull +CMTI: lines out of the idle buffer.
-    const re = /\+CMTI:\s*"([^"]+)"\s*,\s*(\d+)/g;
-    let m;
-    const kept = this._rxBuf;
-    const found = [];
-    while ((m = re.exec(kept)) !== null) {
-      found.push({ storage: m[1], index: parseInt(m[2], 10) });
+  _emitUrc(payload) {
+    if (!this._onUrc) return;
+    try {
+      this._onUrc(payload);
+    } catch {
+      /* ignore */
     }
-    if (found.length) {
-      this._rxBuf = this._rxBuf.replace(/\+CMTI:\s*"[^"]+"\s*,\s*\d+\r?\n?/g, '');
-      for (const item of found) {
+  }
+
+  _pushCallLog(line) {
+    const entry = { t: Date.now(), line: String(line || '') };
+    this._callLog.push(entry);
+    if (this._callLog.length > 80) this._callLog.splice(0, this._callLog.length - 80);
+  }
+
+  _setCallState(state, extra = {}) {
+    this._callState = state;
+    if (extra.number !== undefined) this._callNumber = extra.number;
+    if (extra.clip !== undefined) this._callClip = extra.clip;
+    this._emitUrc({ type: 'CALL', state, number: this._callNumber, clip: this._callClip, ...extra });
+  }
+
+  _drainUrcs() {
+    // Pull known URCs out of the idle buffer (CMTI + voice + USSD leftovers).
+    let buf = this._rxBuf;
+    let changed = false;
+
+    // +CMTI
+    const cmtiRe = /\+CMTI:\s*"([^"]+)"\s*,\s*(\d+)\r?\n?/g;
+    let m;
+    const cmtiFound = [];
+    while ((m = cmtiRe.exec(buf)) !== null) {
+      cmtiFound.push({ storage: m[1], index: parseInt(m[2], 10) });
+    }
+    if (cmtiFound.length) {
+      buf = buf.replace(/\+CMTI:\s*"[^"]+"\s*,\s*\d+\r?\n?/g, '');
+      changed = true;
+      for (const item of cmtiFound) {
         this._cmtiQueue.push(item);
-        if (this._onUrc) {
-          try {
-            this._onUrc({ type: 'CMTI', ...item });
-          } catch {
-            /* ignore */
-          }
-        }
+        this._emitUrc({ type: 'CMTI', ...item });
       }
-      // Schedule read without blocking current callers.
       this._enqueue(() => this._handleCmtiQueue());
     }
+
+    // RING
+    if (/(?:^|\r?\n)RING\r?\n?/.test(buf)) {
+      buf = buf.replace(/(?:^|\r?\n)RING\r?\n?/g, '\n');
+      changed = true;
+      this._pushCallLog('RING');
+      this._setCallState('ringing');
+    }
+
+    // +CLIP: "<number>",<type>
+    const clipMatches = [];
+    const clipScan = /\+CLIP:\s*"([^"]*)"\s*,\s*(\d+)[^\r\n]*\r?\n?/g;
+    while ((m = clipScan.exec(buf)) !== null) {
+      clipMatches.push(m[1]);
+    }
+    if (clipMatches.length) {
+      buf = buf.replace(/\+CLIP:\s*"[^"]*"\s*,\s*\d+[^\r\n]*\r?\n?/g, '');
+      changed = true;
+      const num = clipMatches[clipMatches.length - 1];
+      this._callClip = num;
+      this._pushCallLog(`+CLIP ${num}`);
+      this._setCallState(this._callState === 'idle' ? 'ringing' : this._callState, { clip: num });
+    }
+
+    // CONNECT / NO CARRIER / BUSY / NO ANSWER
+    if (/(?:^|\r?\n)CONNECT\b/.test(buf)) {
+      buf = buf.replace(/(?:^|\r?\n)CONNECT[^\r\n]*\r?\n?/g, '\n');
+      changed = true;
+      this._pushCallLog('CONNECT');
+      this._setCallState('active');
+    }
+    if (/(?:^|\r?\n)NO CARRIER\b/.test(buf)) {
+      buf = buf.replace(/(?:^|\r?\n)NO CARRIER\r?\n?/g, '\n');
+      changed = true;
+      this._pushCallLog('NO CARRIER');
+      this._setCallState('idle', { number: null, clip: this._callClip });
+    }
+    if (/(?:^|\r?\n)BUSY\b/.test(buf)) {
+      buf = buf.replace(/(?:^|\r?\n)BUSY\r?\n?/g, '\n');
+      changed = true;
+      this._pushCallLog('BUSY');
+      this._setCallState('idle', { number: null });
+    }
+    if (/(?:^|\r?\n)NO ANSWER\b/.test(buf)) {
+      buf = buf.replace(/(?:^|\r?\n)NO ANSWER\r?\n?/g, '\n');
+      changed = true;
+      this._pushCallLog('NO ANSWER');
+      this._setCallState('idle', { number: null });
+    }
+
+    // +CUSD leftover URC (when not awaited)
+    const cusdRe = /\+CUSD:\s*([^\r\n]+)\r?\n?/g;
+    const cusdBits = [];
+    while ((m = cusdRe.exec(buf)) !== null) cusdBits.push(m[1]);
+    if (cusdBits.length) {
+      buf = buf.replace(/\+CUSD:\s*[^\r\n]+\r?\n?/g, '');
+      changed = true;
+      const raw = cusdBits[cusdBits.length - 1];
+      this._lastUssd = { raw, at: Date.now() };
+      this._emitUrc({ type: 'CUSD', raw });
+    }
+
+    if (changed) this._rxBuf = buf.replace(/^\n+/, '');
   }
 
   async _handleCmtiQueue() {
@@ -286,9 +390,18 @@ class AtModem {
       this._attachDataListener();
 
       // PDU mode like common AT/modem SMS tools (CMGF=0 + CNMI).
-      const cmds = ['ATE0', 'AT+CMGF=0', 'AT+CNMI=2,1,0,0,0'];
+      // CLIP=1 for caller ID on voice URCs (common Mac-tool AT practice).
+      const cmds = ['ATE0', 'AT+CMGF=0', 'AT+CNMI=2,1,0,0,0', 'AT+CLIP=1'];
       for (const cmd of cmds) {
-        await this._command(cmd);
+        try {
+          await this._command(cmd);
+        } catch (err) {
+          if (cmd === 'AT+CLIP=1') {
+            /* CLIP optional on some firmwares */
+          } else {
+            throw err;
+          }
+        }
       }
       // Prefer SM as primary read/write storage; fall back to ME.
       try {
@@ -358,6 +471,7 @@ class AtModem {
     });
 
     await this._readImsLocked();
+    await this._readUsbcfgLocked();
   }
 
   async _readImsLocked() {
@@ -440,6 +554,284 @@ class AtModem {
       }
       return { status: this.status(), messages: this.messages() };
     });
+  }
+
+
+  callStatus() {
+    return {
+      status: this.status(),
+      callState: this._callState,
+      callNumber: this._callNumber,
+      callClip: this._callClip,
+      callLog: this._callLog.slice(-40),
+    };
+  }
+
+  async _readUsbcfgLocked() {
+    const raw = await this._safeQuery('AT+QCFG="usbcfg"', (r) => r, 5000);
+    if (!raw) {
+      this._usbcfgRaw = null;
+      this._usbcfgUac = null;
+      return null;
+    }
+    const line = firstMatch(raw, /\+QCFG:\s*"usbcfg"\s*,\s*([^\r\n]+)/i) || raw.trim();
+    this._usbcfgRaw = line;
+    // Last CSV field is commonly the UAC flag on Quectel modules.
+    const fields = parseCsvFields(line.replace(/^\+QCFG:\s*"usbcfg"\s*,\s*/i, ''));
+    const last = fields.length ? fields[fields.length - 1].trim() : '';
+    const uacNum = last === '' ? null : parseInt(last, 10);
+    this._usbcfgUac = Number.isFinite(uacNum) ? uacNum : null;
+    return { raw: line, fields, uac: this._usbcfgUac };
+  }
+
+  dial(number) {
+    return this._enqueue(() => this._dialLocked(number));
+  }
+
+  async _dialLocked(number) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const num = String(number || '').trim().replace(/[^\d+*#]/g, '');
+    if (!num) throw new Error('请输入号码');
+    if (this._imsRegistered !== 1) {
+      // Soft warn — still allow attempt; UI should warn harder.
+      this._pushCallLog('警告: IMS 未注册，拨号可能失败');
+    }
+    this._callNumber = num;
+    this._callClip = null;
+    this._setCallState('dialing', { number: num });
+    this._pushCallLog(`ATD${num};`);
+    try {
+      // Voice call: trailing semicolon (3GPP ATD voice).
+      await this._command(`ATD${num};`, { timeout: 15000 });
+      this._pushCallLog('ATD OK');
+      return { ok: true, status: this.status() };
+    } catch (err) {
+      this._setCallState('idle', { number: null });
+      this._pushCallLog(`ATD 失败: ${err.message || err}`);
+      throw err;
+    }
+  }
+
+  answer() {
+    return this._enqueue(() => this._answerLocked());
+  }
+
+  async _answerLocked() {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    this._pushCallLog('ATA');
+    await this._command('ATA', { timeout: 10000 });
+    this._setCallState('active');
+    this._pushCallLog('ATA OK');
+    return { ok: true, status: this.status() };
+  }
+
+  hangup() {
+    return this._enqueue(() => this._hangupLocked());
+  }
+
+  async _hangupLocked() {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    this._pushCallLog('ATH');
+    this._setCallState('ending');
+    try {
+      await this._command('ATH', { timeout: 10000 });
+    } catch (err) {
+      // Some firmwares return NO CARRIER instead of OK on ATH.
+      const msg = String(err.message || err);
+      if (!/NO CARRIER/i.test(msg)) throw err;
+    }
+    this._setCallState('idle', { number: null });
+    this._pushCallLog('挂断');
+    return { ok: true, status: this.status() };
+  }
+
+  sendUssd(code) {
+    return this._enqueue(() => this._sendUssdLocked(code));
+  }
+
+  async _sendUssdLocked(code) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const ussd = String(code || '').trim();
+    if (!ussd) throw new Error('USSD 码不能为空');
+    // AT+CUSD=1,"*208#",15 — DCS 15 = GSM7 default alphabet
+    this._rxBuf = '';
+    this._serial.write(`AT+CUSD=1,"${ussd.replace(/"/g, '')}",15\r`);
+    await new Promise((resolve, reject) => {
+      this._serial.drain((err) => (err ? reject(err) : resolve()));
+    });
+
+    const deadline = Date.now() + 45000;
+    this._awaitingResponse = true;
+    let gotOk = false;
+    let cusdRaw = null;
+    try {
+      while (Date.now() < deadline && !this._stopped) {
+        const text = this._rxBuf;
+        if (!gotOk && /(?:^|\r?\n)OK\r?\n/.test(text)) gotOk = true;
+        if (/(?:^|\r?\n)(?:ERROR|\+CME ERROR:)/.test(text)) {
+          const err = text.trim().slice(0, 300);
+          this._rxBuf = '';
+          throw new Error(err);
+        }
+        const m = text.match(/\+CUSD:\s*([^\r\n]+)/);
+        if (m) {
+          cusdRaw = m[1];
+          this._rxBuf = '';
+          break;
+        }
+        await sleep(40);
+      }
+    } finally {
+      this._awaitingResponse = false;
+      this._drainUrcs();
+    }
+    if (!cusdRaw) {
+      // Some modules only return OK; leave raw empty.
+      if (!gotOk) throw new Error('USSD 超时');
+      cusdRaw = '(无 +CUSD 正文，仅收到 OK)';
+    }
+    // Decode quoted UCS2 hex if present: +CUSD: 0,"00410042",72
+    let textOut = cusdRaw;
+    const qm = cusdRaw.match(/^(?:\d+\s*,\s*)?"([0-9A-Fa-f]*)"\s*(?:,\s*(\d+))?/);
+    if (qm && qm[1] && /^[0-9A-Fa-f]*$/.test(qm[1]) && qm[1].length >= 4 && qm[1].length % 4 === 0) {
+      try {
+        const hex = qm[1];
+        const buf = Buffer.from(hex, 'hex');
+        // UCS2 BE
+        textOut = buf.swap16().toString('utf16le');
+      } catch {
+        textOut = cusdRaw;
+      }
+    } else {
+      const qm2 = cusdRaw.match(/^(?:\d+\s*,\s*)?"([^"]*)"/);
+      if (qm2) textOut = qm2[1];
+    }
+    this._lastUssd = { code: ussd, raw: cusdRaw, text: textOut, at: Date.now() };
+    return {
+      ok: true,
+      code: ussd,
+      raw: cusdRaw,
+      text: textOut,
+      status: this.status(),
+    };
+  }
+
+  queryUsbcfg() {
+    return this._enqueue(async () => {
+      if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+      const info = await this._readUsbcfgLocked();
+      return { ok: true, ...(info || {}), status: this.status() };
+    });
+  }
+
+  /**
+   * Set usbcfg last flag (UAC) to 1. Saves previous raw field list for restore.
+   * Requires module reboot to take effect — caller must confirm in UI.
+   */
+  enableUsbAudio({ reboot = false } = {}) {
+    return this._enqueue(() => this._enableUsbAudioLocked(reboot));
+  }
+
+  async _enableUsbAudioLocked(reboot) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const info = await this._readUsbcfgLocked();
+    if (!info || !info.fields || !info.fields.length) {
+      throw new Error('无法读取 AT+QCFG="usbcfg"');
+    }
+    this._usbcfgPrev = {
+      fields: info.fields.slice(),
+      uac: info.uac,
+      raw: info.raw,
+      at: Date.now(),
+    };
+    const next = info.fields.slice();
+    next[next.length - 1] = '1';
+    const arg = next.join(',');
+    await this._command(`AT+QCFG="usbcfg",${arg}`, { timeout: 8000 });
+    await this._readUsbcfgLocked();
+    let rebooting = false;
+    if (reboot) {
+      rebooting = true;
+      try {
+        this._serial.write('AT+CFUN=1,1\r');
+        await new Promise((resolve, reject) => {
+          this._serial.drain((err) => (err ? reject(err) : resolve()));
+        });
+      } catch {
+        /* ignore */
+      }
+      await sleep(500);
+      await this._disconnect();
+      this._error = '已修改 usbcfg UAC=1 并软重启，请等待模组重新枚举后点「重新连接」';
+    }
+    return {
+      ok: true,
+      previous: this._usbcfgPrev,
+      status: this.status(),
+      rebooting,
+      note: 'UAC 变更通常需重启模组后生效',
+    };
+  }
+
+  restoreUsbcfg({ reboot = false } = {}) {
+    return this._enqueue(() => this._restoreUsbcfgLocked(reboot));
+  }
+
+  async _restoreUsbcfgLocked(reboot) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    if (!this._usbcfgPrev || !this._usbcfgPrev.fields) {
+      throw new Error('无已保存的 usbcfg 旧值可恢复（本次会话内未改过）');
+    }
+    const arg = this._usbcfgPrev.fields.join(',');
+    await this._command(`AT+QCFG="usbcfg",${arg}`, { timeout: 8000 });
+    await this._readUsbcfgLocked();
+    let rebooting = false;
+    if (reboot) {
+      rebooting = true;
+      try {
+        this._serial.write('AT+CFUN=1,1\r');
+        await new Promise((resolve, reject) => {
+          this._serial.drain((err) => (err ? reject(err) : resolve()));
+        });
+      } catch {
+        /* ignore */
+      }
+      await sleep(500);
+      await this._disconnect();
+      this._error = '已恢复 usbcfg 并软重启，请等待模组重新枚举后点「重新连接」';
+    }
+    return { ok: true, status: this.status(), rebooting };
+  }
+
+  tryQpcmv() {
+    return this._enqueue(() => this._tryQpcmvLocked());
+  }
+
+  async _tryQpcmvLocked() {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    // Quectel PCM/UAC voice path; many QDC507 builds return ERROR.
+    try {
+      await this._command('AT+QPCMV=1,2', { timeout: 5000 });
+      this._qpcmvOk = true;
+      this._qpcmvError = null;
+      return {
+        ok: true,
+        qpcmvOk: true,
+        message: 'AT+QPCMV=1,2 已接受',
+        status: this.status(),
+      };
+    } catch (err) {
+      this._qpcmvOk = false;
+      this._qpcmvError = String(err.message || err);
+      return {
+        ok: false,
+        qpcmvOk: false,
+        error: this._qpcmvError,
+        message:
+          '本机固件可能无 UAC/QPCMV，通话控制可用但电脑音频可能无声',
+        status: this.status(),
+      };
+    }
   }
 
   enableIms({ reboot = false } = {}) {

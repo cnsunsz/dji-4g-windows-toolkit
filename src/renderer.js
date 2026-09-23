@@ -4,10 +4,19 @@ const $ = (id) => document.getElementById(id);
 
 const THEME_KEY = 'dji4g-toolkit-theme';
 const VIEW_META = {
-  overview: { title: '模块概览', sub: '运营商 / 信号 / SIM / IMS 一览' },
+  overview: { title: '模块概览', sub: '运营商 / 信号 / SIM / IMS / 本机号码' },
   sms: { title: '短信', sub: 'PDU 收发 · SM / ME / MT · +CMTI 监听' },
+  call: { title: '通话', sub: '实验功能 · AT 语音控制 · 音频路径视固件而定' },
   drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC' },
   diag: { title: '诊断', sub: 'USB / AT 口 / ATI · IMS 启用' },
+};
+
+const CALL_STATE_LABEL = {
+  idle: '空闲',
+  dialing: '拨号中',
+  ringing: '振铃',
+  active: '通话中',
+  ending: '挂断中',
 };
 
 let refreshTimer = null;
@@ -16,6 +25,9 @@ let lastStatus = null;
 /** @type {Set<string>} */
 let selectedSmsKeys = new Set();
 let lastMessages = [];
+/** Track ICCID so UI clears number field when SIM changes */
+let uiIccid = null;
+let lastDetectedNumbers = [];
 
 function setBusy(isBusy) {
   busy = isBusy;
@@ -32,6 +44,15 @@ function setBusy(isBusy) {
     'btnSmsClearSm',
     'btnEnableIms',
     'btnEnableImsReboot',
+    'btnMsisdnSave',
+    'btnUssd',
+    'btnDial',
+    'btnAnswer',
+    'btnHangup',
+    'btnQueryUsbcfg',
+    'btnEnableUsbAudio',
+    'btnRestoreUsbcfg',
+    'btnTryQpcmv',
   ]) {
     const el = $(id);
     if (el) el.disabled = isBusy;
@@ -101,6 +122,126 @@ function setTile(field, text, tone) {
   el.className = 'tile-v' + (tone ? ` is-${tone}` : '');
 }
 
+function sourcePillClass(source) {
+  if (source === 'cnum') return 'source-pill is-cnum';
+  if (source === 'saved') return 'source-pill is-saved';
+  return 'source-pill is-none';
+}
+
+function sourceLabel(s) {
+  if (!s) return '未设置';
+  if (s.effectiveMsisdnLabel) return s.effectiveMsisdnLabel;
+  if (s.effectiveMsisdnSource === 'cnum') return 'CNUM';
+  if (s.effectiveMsisdnSource === 'saved') return '已保存';
+  return '未设置';
+}
+
+function paintMsisdn(s) {
+  const eff = (s && s.effectiveMsisdn) || null;
+  const src = (s && s.effectiveMsisdnSource) || 'none';
+  const label = sourceLabel(s);
+
+  const effEl = $('msisdnEffective');
+  if (effEl) effEl.textContent = eff || '未设置';
+
+  const pill = $('msisdnSourcePill');
+  if (pill) {
+    pill.textContent = label;
+    pill.className = sourcePillClass(src);
+  }
+
+  const smsNum = $('smsOwnNumber');
+  if (smsNum) smsNum.textContent = eff || '未设置';
+  const smsSrc = $('smsOwnSource');
+  if (smsSrc) {
+    smsSrc.textContent = label;
+    smsSrc.className = sourcePillClass(src);
+  }
+
+  const note = $('msisdnSourceNote');
+  if (note) {
+    if (src === 'cnum') {
+      note.textContent = '来自模组 AT+CNUM';
+    } else if (src === 'saved') {
+      note.textContent = 'CNUM 为空；显示已按 ICCID 保存的本机号码';
+    } else {
+      note.textContent = 'CNUM 为空且未保存；国内移动卡常见，可手动填写或 USSD 查号';
+    }
+  }
+
+  const iccid = (s && s.iccid) || null;
+  if (iccid !== uiIccid) {
+    uiIccid = iccid;
+    const input = $('msisdnInput');
+    if (input) {
+      // Clear until user saves again for this ICCID; prefill saved if any.
+      input.value = (s && s.savedMsisdn) || '';
+    }
+  } else if (s && s.savedMsisdn && $('msisdnInput') && !$('msisdnInput').value) {
+    $('msisdnInput').value = s.savedMsisdn;
+  }
+}
+
+function paintCall(s) {
+  if (!s) return;
+  const imsOk = s.imsEnable === 1 && s.imsRegistered === 1;
+  const warn = $('callImsWarn');
+  if (warn) warn.hidden = !s.connected || imsOk;
+
+  const imsLine = $('callImsLine');
+  if (imsLine) imsLine.textContent = `IMS：${imsLabel(s)}`;
+
+  const state = s.callState || 'idle';
+  const pill = $('callStatePill');
+  if (pill) {
+    pill.textContent = CALL_STATE_LABEL[state] || state;
+    pill.className =
+      'call-state-pill' +
+      (state === 'active' ? ' is-active' : state === 'ringing' || state === 'dialing' ? ' is-ringing' : '');
+  }
+
+  const clip = $('callClipLine');
+  if (clip) {
+    const who = s.callClip || s.callNumber || '—';
+    clip.textContent = `来电显示 / 当前号码：${who}`;
+  }
+
+  const usbcfgLine = $('usbcfgLine');
+  if (usbcfgLine) {
+    if (s.usbcfgRaw) {
+      usbcfgLine.textContent = `usbcfg：${s.usbcfgRaw} · UAC=${s.usbcfgUac == null ? '?' : s.usbcfgUac}`;
+    } else {
+      usbcfgLine.textContent = 'usbcfg / UAC：未查询';
+    }
+  }
+
+  const qpcmvLine = $('qpcmvLine');
+  if (qpcmvLine) {
+    if (s.qpcmvOk === true) qpcmvLine.textContent = 'QPCMV：已接受 (AT+QPCMV=1,2)';
+    else if (s.qpcmvOk === false)
+      qpcmvLine.textContent =
+        '本机固件可能无 UAC/QPCMV，通话控制可用但电脑音频可能无声' +
+        (s.qpcmvError ? `（${String(s.qpcmvError).slice(0, 80)}）` : '');
+    else qpcmvLine.textContent = 'QPCMV：未尝试';
+  }
+
+  if (Array.isArray(s.callLog) && s.callLog.length) {
+    const log = $('callLog');
+    if (log) {
+      log.textContent = s.callLog
+        .map((e) => {
+          const d = new Date(e.t || Date.now());
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          const ss = String(d.getSeconds()).padStart(2, '0');
+          return `[${hh}:${mm}:${ss}] ${e.line}`;
+        })
+        .join('\n');
+      log.scrollTop = log.scrollHeight;
+    }
+  }
+}
+
 function paintOverview(s) {
   if (!s || typeof s === 'string') {
     setTile('operator', '—', 'muted');
@@ -111,6 +252,7 @@ function paintOverview(s) {
     setTile('port', '—', 'muted');
     setTile('iccid', '—', 'muted');
     setTile('reg', '—', 'muted');
+    paintMsisdn(null);
     return;
   }
 
@@ -137,7 +279,14 @@ function paintOverview(s) {
   else if (s.creg) netParts.push(`CREG ${s.creg}`);
   setTile('network', netParts.join(' · ') || '—', connected ? 'info' : 'muted');
 
-  setTile('sim', s.ownNumber || '(无 CNUM)', s.ownNumber ? 'ok' : 'muted');
+  // Never claim CNUM works when empty — show effective number with source.
+  const eff = s.effectiveMsisdn;
+  if (eff) {
+    const tag = s.effectiveMsisdnSource === 'cnum' ? 'CNUM' : '已保存';
+    setTile('sim', `${eff}（${tag}）`, 'ok');
+  } else {
+    setTile('sim', '未设置', 'muted');
+  }
 
   let imsTone = 'muted';
   if (s.imsEnable === 1 && s.imsRegistered === 1) imsTone = 'ok';
@@ -152,6 +301,9 @@ function paintOverview(s) {
     .filter(Boolean)
     .join(' / ');
   setTile('reg', reg || (connected ? '已连接' : '未注册'), connected ? 'ok' : 'muted');
+
+  paintMsisdn(s);
+  paintCall(s);
 }
 
 function setSmsStatus(s, ok) {
@@ -187,10 +339,34 @@ function msgKey(m) {
   return `${m.storage || 'SM'}:${m.index}`;
 }
 
+function renderDetectedChips(boxId, listId, numbers, { preferOwn = true } = {}) {
+  const box = $(boxId);
+  const list = $(listId);
+  if (!box || !list) return;
+  const items = Array.isArray(numbers) ? numbers.slice() : [];
+  if (!items.length) {
+    box.hidden = true;
+    list.textContent = '';
+    return;
+  }
+  if (preferOwn) items.sort((a, b) => Number(!!b.ownContext) - Number(!!a.ownContext));
+  box.hidden = false;
+  list.textContent = '';
+  for (const n of items) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chip' + (n.ownContext ? ' is-own' : '');
+    const label = n.e164 || n.number;
+    btn.textContent = n.ownContext ? `${label} · 疑似本机` : label;
+    btn.title = n.snippet || label;
+    btn.addEventListener('click', () => saveMsisdnNumber(n.e164 || n.number));
+    list.appendChild(btn);
+  }
+}
+
 function renderMessages(msgs) {
   const box = $('smsList');
   lastMessages = Array.isArray(msgs) ? msgs.slice() : [];
-  // Drop selections that no longer exist
   const alive = new Set(lastMessages.filter((m) => m.index != null && m.index !== '').map(msgKey));
   for (const k of [...selectedSmsKeys]) {
     if (!alive.has(k)) selectedSmsKeys.delete(k);
@@ -276,6 +452,33 @@ function selectedItems() {
   return items;
 }
 
+async function saveMsisdnNumber(number) {
+  const num = String(number || '').trim();
+  if (!num) {
+    setSmsStatus('请填写本机号码', false);
+    return;
+  }
+  setBusy(true);
+  try {
+    const result = await window.toolkit.msisdnSet(num, uiIccid || undefined);
+    if (!result.ok) throw new Error(result.error || '保存失败');
+    if ($('msisdnInput')) $('msisdnInput').value = num;
+    if (result.status) {
+      setSmsStatus(result.status, !!(result.status.connected && !result.status.error));
+    }
+    const banner = $('smsStatus');
+    if (banner) {
+      banner.hidden = false;
+      banner.textContent = '已按 ICCID 保存本机号码';
+      banner.className = 'connect-banner ok';
+    }
+  } catch (e) {
+    setSmsStatus('保存本机号码失败: ' + (e.message || e), false);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function deleteOneMessage(m) {
   if (!m || m.index == null || m.index === '') return;
   const ok = window.confirm(
@@ -329,6 +532,8 @@ async function refreshSms() {
     const s = data.status || {};
     setSmsStatus(s, !!(s.connected && !s.error));
     renderMessages(data.messages || []);
+    lastDetectedNumbers = data.detectedNumbers || [];
+    renderDetectedChips('smsDetectBox', 'smsDetectList', lastDetectedNumbers);
     ensureAutoRefresh(!!s.connected);
   } catch (e) {
     setSmsStatus(String(e.message || e), false);
@@ -348,6 +553,12 @@ function ensureAutoRefresh(connected) {
   }
 }
 
+function currentUssdCode() {
+  const preset = $('ussdPreset')?.value;
+  if (preset === 'custom') return ($('ussdCustom')?.value || '').trim();
+  return String(preset || '').trim();
+}
+
 async function init() {
   applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
 
@@ -365,10 +576,61 @@ async function init() {
   $('btnTheme').onclick = () => toggleTheme();
 
   if (window.toolkit.onSmsUrc) {
-    window.toolkit.onSmsUrc(() => {
+    window.toolkit.onSmsUrc((payload) => {
+      if (payload && payload.type === 'CALL') {
+        paintCall({ ...(lastStatus || {}), callState: payload.state, callNumber: payload.number, callClip: payload.clip });
+        return;
+      }
       if (!busy) refreshSms();
     });
   }
+  if (window.toolkit.onCallUrc) {
+    window.toolkit.onCallUrc(async () => {
+      try {
+        const data = await window.toolkit.callStatus();
+        if (data.status) {
+          lastStatus = data.status;
+          paintCall(data.status);
+        }
+      } catch (_) {}
+    });
+  }
+
+  $('ussdPreset').onchange = () => {
+    const custom = $('ussdCustom');
+    if (!custom) return;
+    custom.hidden = $('ussdPreset').value !== 'custom';
+  };
+
+  $('btnMsisdnSave').onclick = async () => {
+    await saveMsisdnNumber($('msisdnInput').value);
+  };
+
+  $('btnUssd').onclick = async () => {
+    const code = currentUssdCode();
+    if (!code) {
+      setSmsStatus('请选择或填写 USSD 码', false);
+      return;
+    }
+    setBusy(true);
+    const out = $('ussdResult');
+    out.hidden = false;
+    out.textContent = `发送 USSD ${code} …`;
+    try {
+      const result = await window.toolkit.ussdSend(code);
+      if (!result.ok) throw new Error(result.error || 'USSD 失败');
+      const text = result.text || result.raw || '';
+      out.textContent = `>>> ${code}\n${text}\n\n(raw) ${result.raw || ''}`;
+      if (result.status) setSmsStatus(result.status, !!(result.status.connected && !result.status.error));
+      renderDetectedChips('ussdDetectBox', 'ussdDetectList', result.detected || []);
+      switchView('overview');
+    } catch (e) {
+      out.textContent = 'USSD 失败: ' + (e.message || e);
+      setSmsStatus('USSD 失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   $('btnDrivers').onclick = async () => {
     const log = $('driverLog');
@@ -541,6 +803,148 @@ async function init() {
       $('btnSend').click();
     }
   });
+
+  // —— Call ——
+  $('dialPad').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-digit]');
+    if (!btn) return;
+    const input = $('callNumber');
+    input.value = (input.value || '') + btn.getAttribute('data-digit');
+  });
+
+  $('btnDial').onclick = async () => {
+    const num = $('callNumber').value.trim();
+    if (!num) {
+      setSmsStatus('请输入要拨打的号码', false);
+      switchView('call');
+      return;
+    }
+    if (lastStatus && lastStatus.imsRegistered !== 1) {
+      const go = window.confirm('IMS 当前未注册，拨号可能失败。仍要尝试？');
+      if (!go) return;
+    }
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callDial(num);
+      if (!result.ok) throw new Error(result.error || '拨号失败');
+      if (result.status) {
+        lastStatus = result.status;
+        paintCall(result.status);
+      }
+    } catch (e) {
+      setSmsStatus('拨号失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnAnswer').onclick = async () => {
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callAnswer();
+      if (!result.ok) throw new Error(result.error || '接听失败');
+      if (result.status) {
+        lastStatus = result.status;
+        paintCall(result.status);
+      }
+    } catch (e) {
+      setSmsStatus('接听失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnHangup').onclick = async () => {
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callHangup();
+      if (!result.ok) throw new Error(result.error || '挂断失败');
+      if (result.status) {
+        lastStatus = result.status;
+        paintCall(result.status);
+      }
+    } catch (e) {
+      setSmsStatus('挂断失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnQueryUsbcfg').onclick = async () => {
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callQueryUsbcfg();
+      if (!result.ok && result.error) throw new Error(result.error);
+      if (result.status) {
+        lastStatus = result.status;
+        paintCall(result.status);
+      }
+    } catch (e) {
+      setSmsStatus('查询 usbcfg 失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnEnableUsbAudio').onclick = async () => {
+    const ok = window.confirm(
+      '将尝试把 AT+QCFG="usbcfg" 最后一位（UAC）设为 1，并保存旧值以便恢复。\n\n更改后通常需要软重启模组才生效。\n是否继续并软重启？'
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callEnableUsbAudio(true);
+      if (!result.ok) throw new Error(result.error || '失败');
+      setSmsStatus(
+        (result.status && result.status.error) ||
+          '已设置 UAC=1 并软重启，请等待模组重新枚举后点「重新连接」',
+        false
+      );
+    } catch (e) {
+      setSmsStatus('启用 USB 音频失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnRestoreUsbcfg').onclick = async () => {
+    const ok = window.confirm('恢复本次会话保存的 usbcfg 旧值，并软重启模组？');
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callRestoreUsbcfg(true);
+      if (!result.ok) throw new Error(result.error || '失败');
+      setSmsStatus(
+        (result.status && result.status.error) ||
+          '已恢复 usbcfg 并软重启，请等待后点「重新连接」',
+        false
+      );
+    } catch (e) {
+      setSmsStatus('恢复 usbcfg 失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnTryQpcmv').onclick = async () => {
+    setBusy(true);
+    try {
+      const result = await window.toolkit.callTryQpcmv();
+      if (result.status) {
+        lastStatus = result.status;
+        paintCall(result.status);
+      }
+      if (!result.ok) {
+        setSmsStatus(result.message || '本机固件可能无 UAC/QPCMV，通话控制可用但电脑音频可能无声', false);
+      } else {
+        setSmsStatus(result.message || 'QPCMV 已接受', true);
+      }
+    } catch (e) {
+      setSmsStatus('QPCMV 失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   setBusy(true);
   try {

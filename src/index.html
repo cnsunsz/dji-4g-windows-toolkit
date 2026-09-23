@@ -32,6 +32,10 @@
           <span class="rail-ico" aria-hidden="true">✉</span>
           <span class="rail-label">短信</span>
         </button>
+        <button type="button" class="rail-item" data-view="call" role="tab" aria-selected="false">
+          <span class="rail-ico" aria-hidden="true">☎</span>
+          <span class="rail-label">通话<span class="exp-badge">实验</span></span>
+        </button>
         <button type="button" class="rail-item" data-view="drivers" role="tab" aria-selected="false">
           <span class="rail-ico" aria-hidden="true">⚙</span>
           <span class="rail-label">驱动</span>
@@ -75,14 +79,59 @@
             <article class="tile"><span class="tile-k">注册状态</span><strong class="tile-v" data-field="reg">—</strong></article>
           </div>
           <div id="smsStatus" class="connect-banner" hidden></div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">本机号码</p>
+                <h2>MSISDN</h2>
+              </div>
+              <p class="panel-note" id="msisdnSourceNote">优先 CNUM；国内移动卡 CNUM 常为空时可手动保存或 USSD 查号</p>
+            </div>
+            <div class="msisdn-row">
+              <div class="msisdn-eff">
+                <span class="msisdn-eff-k">当前有效号码</span>
+                <strong id="msisdnEffective" class="msisdn-eff-v">未设置</strong>
+                <span id="msisdnSourcePill" class="source-pill">未设置</span>
+              </div>
+              <input id="msisdnInput" type="tel" placeholder="手动填写，如 13800138000 或 +86138…" autocomplete="off">
+              <button type="button" class="btn primary" id="btnMsisdnSave">保存本机号码</button>
+            </div>
+            <div class="ussd-row">
+              <label class="ussd-label" for="ussdPreset">USSD 查号</label>
+              <select id="ussdPreset">
+                <option value="*208#">*208#（常见查本机号）</option>
+                <option value="*100#">*100#（移动服务）</option>
+                <option value="*101#">*101#（余额等）</option>
+                <option value="custom">自定义…</option>
+              </select>
+              <input id="ussdCustom" type="text" placeholder="自定义 USSD，如 *208#" hidden autocomplete="off">
+              <button type="button" class="btn ghost" id="btnUssd">发送 USSD</button>
+            </div>
+            <pre id="ussdResult" class="console compact" hidden></pre>
+            <div id="ussdDetectBox" class="detect-box" hidden>
+              <p class="muted-line" style="margin:0 0 8px">在结果中检测到号码，可一键保存：</p>
+              <div id="ussdDetectList" class="chip-row"></div>
+            </div>
+            <div id="smsDetectBox" class="detect-box" hidden>
+              <p class="muted-line" style="margin:0 0 8px">近期短信中检测到的号码（含「本机号码」语境优先）：</p>
+              <div id="smsDetectList" class="chip-row"></div>
+            </div>
+          </div>
+
           <div class="hint-card">
             <strong>提示</strong>
-            <p>漫游物联网卡（如英国 IoT）收信常需 IMS 已注册。发短信请发到本机显示的国际号码。连接时不会自动删除模组内短信。</p>
+            <p>国内移动（CMCC）SIM 上 <code>AT+CNUM</code> 常为空，不代表没号——请用下方手动保存或 USSD 查号。漫游物联网卡收信常需 IMS 已注册。连接时不会自动删除模组内短信。</p>
           </div>
         </section>
 
         <!-- SMS -->
         <section class="view" id="view-sms" data-title="短信" data-sub="PDU 收发 · SM / ME / MT · +CMTI 监听">
+          <div class="own-bar" id="smsOwnBar">
+            <span class="own-bar-k">本机号码</span>
+            <strong id="smsOwnNumber">未设置</strong>
+            <span id="smsOwnSource" class="source-pill">未设置</span>
+          </div>
           <div class="panel">
             <div class="panel-head">
               <div>
@@ -114,6 +163,64 @@
               </div>
             </div>
             <div id="smsList" class="inbox" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- Call (experimental) -->
+        <section class="view" id="view-call" data-title="通话" data-sub="实验功能 · AT 语音控制 · 音频路径视固件而定">
+          <div id="callImsWarn" class="connect-banner bad" hidden>IMS 未注册：语音呼叫可能失败。请先在「诊断」启用 IMS 并确认 IMS=1,1。</div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">VOICE <span class="exp-badge">实验</span></p>
+                <h2>拨号</h2>
+              </div>
+              <div class="call-state-pill" id="callStatePill">空闲</div>
+            </div>
+            <div class="call-ims-line" id="callImsLine">IMS：—</div>
+            <div class="dial-row">
+              <input id="callNumber" type="tel" placeholder="号码，如 10086 或 +86138…" autocomplete="off">
+              <button type="button" class="btn primary" id="btnDial">拨打</button>
+              <button type="button" class="btn ghost" id="btnAnswer">接听</button>
+              <button type="button" class="btn ghost danger-ghost" id="btnHangup">挂断</button>
+            </div>
+            <div class="dial-pad" id="dialPad" aria-label="拨号键盘">
+              <button type="button" data-digit="1">1</button>
+              <button type="button" data-digit="2">2</button>
+              <button type="button" data-digit="3">3</button>
+              <button type="button" data-digit="4">4</button>
+              <button type="button" data-digit="5">5</button>
+              <button type="button" data-digit="6">6</button>
+              <button type="button" data-digit="7">7</button>
+              <button type="button" data-digit="8">8</button>
+              <button type="button" data-digit="9">9</button>
+              <button type="button" data-digit="*">*</button>
+              <button type="button" data-digit="0">0</button>
+              <button type="button" data-digit="#">#</button>
+            </div>
+            <p class="muted-line" id="callClipLine">来电显示：—</p>
+            <pre id="callLog" class="console compact">通话日志将显示于此（RING / +CLIP / CONNECT / NO CARRIER）</pre>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">USB AUDIO</p>
+                <h2>电脑音频路径（实验）</h2>
+              </div>
+            </div>
+            <p class="muted-line" id="usbcfgLine">usbcfg / UAC：未查询</p>
+            <p class="muted-line" id="qpcmvLine">QPCMV：未尝试</p>
+            <div class="btn-row wrap">
+              <button type="button" class="btn ghost" id="btnQueryUsbcfg">查询 usbcfg</button>
+              <button type="button" class="btn warn" id="btnEnableUsbAudio">尝试启用 USB 音频(需重启模组)</button>
+              <button type="button" class="btn ghost" id="btnRestoreUsbcfg">恢复上次 usbcfg</button>
+              <button type="button" class="btn ghost" id="btnTryQpcmv">尝试 QPCMV=1,2</button>
+            </div>
+            <div class="hint-card warn">
+              <strong>安全说明</strong>
+              <p>修改 <code>AT+QCFG="usbcfg"</code> 最后一位（UAC）前会保存旧值以便恢复。更改后通常需软重启才生效。若 <code>AT+QPCMV</code> 返回 ERROR，表示本机固件可能无 UAC/QPCMV——通话控制（拨打/接听/挂断）仍可用，但电脑端可能无声。</p>
+            </div>
           </div>
         </section>
 
