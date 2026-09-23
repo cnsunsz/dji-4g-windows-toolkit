@@ -1322,3 +1322,22 @@ select {
 .chat-bubbles { gap: 12px; padding: 18px 16px; }
 .bubble { border-radius: 18px; padding: 10px 14px; font-size: 14px; }
 .bubble-row { max-width: min(72%, 480px); }
+
+
+/* Ringtone / SMS corner settings (v0.8) */
+.ringtone-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.btn.compact {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+#setRingtoneVolume {
+  width: 120px;
+  accent-color: var(--accent, #0071e3);
+}

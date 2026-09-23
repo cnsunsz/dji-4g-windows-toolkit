@@ -1,7 +1,7 @@
 {
   "name": "dji-4g-windows-toolkit",
-  "version": "0.7.0",
-  "description": "DJI 4G Windows Toolkit — Electron: Quectel drivers, PDU SMS threads with OTP chips, MSISDN helper, AT console, system theme, experimental voice",
+  "version": "0.8.0",
+  "description": "DJI 4G Windows Toolkit — Electron: Quectel drivers, PDU SMS threads with OTP chips, Mac-like corner call/SMS cards, original style ringtones + custom path, AT console",
   "main": "electron/main.js",
   "author": "cnsunsz",
   "license": "MIT",
@@ -39,7 +39,8 @@
       "src/**/*",
       "package.json",
       "build/icon.png",
-      "build/icon.ico"
+      "build/icon.ico",
+      "assets/**/*"
     ],
     "extraResources": [
       {

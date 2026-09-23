@@ -302,6 +302,7 @@ class AtModem {
           if (idx >= 0) this._messages[idx] = entry;
           else this._messages.unshift(entry);
           this._messages = reassembleConcat(this._messages);
+          this._emitUrc({ type: 'SMS_NEW', message: entry, storage: entry.storage, index: entry.index });
         }
       } catch (err) {
         this._error = `CMTI 读取失败: ${err.message || err}`;

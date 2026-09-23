@@ -3,13 +3,21 @@
 const fs = require('fs');
 const path = require('path');
 
+const RINGTONE_IDS = ['mute', 'apple', 'xiaomi', 'samsung', 'custom'];
+
 const DEFAULTS = {
   openAtLogin: false,
   closeToTray: true,
-  notifyOnCall: true,
-  popupOnCall: true,
+  notifyOnCall: false, // obsolete: system toast removed in v0.8
+  popupOnCall: true, // Mac-like corner call card
   autoConnect: true,
   flashTrayOnRing: true,
+  ringtone: 'apple',
+  ringtoneVolume: 0.85,
+  /** Absolute path to user-selected local audio; never bundled in release. */
+  customRingtonePath: '',
+  popupOnSms: true, // Mac-like corner SMS card (not system toast)
+  smsSound: true, // original soft chime
 };
 
 /**
@@ -59,10 +67,48 @@ class SettingsStore {
   }
 }
 
+function normalizeRingtone(v) {
+  const raw = String(v == null ? '' : v).trim();
+  const s = raw.toLowerCase();
+  if (RINGTONE_IDS.includes(s)) return s;
+  const map = {
+    静音: 'mute',
+    苹果风: 'apple',
+    小米风: 'xiaomi',
+    三星风: 'samsung',
+    自定义: 'custom',
+    silent: 'mute',
+    none: 'mute',
+    local: 'custom',
+  };
+  if (map[raw] || map[s]) return map[raw] || map[s];
+  return DEFAULTS.ringtone;
+}
+
+function normalizeVolume(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return DEFAULTS.ringtoneVolume;
+  return Math.max(0, Math.min(1, n));
+}
+
+function normalizePath(v) {
+  if (v == null || v === false) return '';
+  const s = String(v).trim();
+  if (!s || s.length > 1024) return '';
+  return s;
+}
+
 function pickKnown(obj) {
   const out = {};
   for (const k of Object.keys(DEFAULTS)) {
-    if (Object.prototype.hasOwnProperty.call(obj, k)) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    if (k === 'ringtone') {
+      out[k] = normalizeRingtone(obj[k]);
+    } else if (k === 'ringtoneVolume') {
+      out[k] = normalizeVolume(obj[k]);
+    } else if (k === 'customRingtonePath') {
+      out[k] = normalizePath(obj[k]);
+    } else {
       out[k] = !!obj[k];
     }
   }
@@ -72,4 +118,6 @@ function pickKnown(obj) {
 module.exports = {
   SettingsStore,
   DEFAULTS,
+  RINGTONE_IDS,
+  normalizeRingtone,
 };

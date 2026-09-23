@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('toolkit', {
   showMain: () => ipcRenderer.invoke('app:showMain'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial) => ipcRenderer.invoke('settings:set', partial),
+  resolveRingtone: () => ipcRenderer.invoke('ringtone:resolve'),
+  pickCustomRingtone: () => ipcRenderer.invoke('ringtone:pickCustom'),
+  clearCustomRingtone: () => ipcRenderer.invoke('ringtone:clearCustom'),
   installDrivers: () => ipcRenderer.invoke('driver:install'),
   installWwanDriver: () => ipcRenderer.invoke('driver:installWwan'),
   detectDevice: (opts) => ipcRenderer.invoke('device:detect', opts),
@@ -54,5 +57,10 @@ contextBridge.exposeInMainWorld('toolkit', {
     const listener = (_evt, payload) => handler(payload);
     ipcRenderer.on('sms:new-inbound', listener);
     return () => ipcRenderer.removeListener('sms:new-inbound', listener);
+  },
+  onOpenSmsThread: (handler) => {
+    const listener = (_evt, payload) => handler(payload);
+    ipcRenderer.on('sms:open-thread', listener);
+    return () => ipcRenderer.removeListener('sms:open-thread', listener);
   },
 });

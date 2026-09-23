@@ -8,8 +8,11 @@ const {
   Tray,
   Menu,
   nativeImage,
-  Notification,
+  dialog,
+  screen,
 } = require('electron');
+const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 const { detectStatus } = require('../src/device');
 const { AtModem } = require('../src/modem');
@@ -22,8 +25,9 @@ const {
 const { SettingsStore } = require('../src/settings-store');
 const { SmsThreadStore, buildThreads } = require('../src/sms-thread-store');
 const { normalizePeer, displayPeer } = require('../src/phone-normalize');
+const { extractOtpCodes } = require('../src/otp');
 
-// Windows toast / jump-list identity
+// Windows jump-list / taskbar identity (toasts for calls removed in v0.8)
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.cnsunsz.dji4gtoolkit');
 }
@@ -34,6 +38,17 @@ let tray = null;
 let isQuitting = false;
 let trayFlashTimer = null;
 let lastIncomingCallNumber = null;
+let callCardWindow = null;
+let callCardReady = false;
+let smsCardWindow = null;
+let smsCardReady = false;
+let smsCardHideTimer = null;
+
+const BUILTIN_RINGTONES = {
+  apple: 'apple-style.wav',
+  xiaomi: 'xiaomi-style.wav',
+  samsung: 'samsung-style.wav',
+};
 
 const modem = new AtModem();
 let msisdnStore = null;
@@ -126,6 +141,279 @@ function loadAppIcon() {
   return nativeImage.createEmpty();
 }
 
+
+function ringtonesDir() {
+  const candidates = [
+    path.join(__dirname, '..', 'assets', 'ringtones'),
+    path.join(process.resourcesPath || '', 'assets', 'ringtones'),
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'assets', 'ringtones'),
+  ];
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(dir)) return dir;
+    } catch {
+      /* ignore */
+    }
+  }
+  return candidates[0];
+}
+
+function resolveRingtoneFileUrl(settings) {
+  const s = settings || getSettingsStore().getAll();
+  const id = s.ringtone || 'apple';
+  if (id === 'mute') return null;
+  if (id === 'custom') {
+    const p = String(s.customRingtonePath || '').trim();
+    if (!p) return null;
+    try {
+      if (!fs.existsSync(p) || !fs.statSync(p).isFile()) return null;
+      return pathToFileURL(p).href;
+    } catch {
+      return null;
+    }
+  }
+  const name = BUILTIN_RINGTONES[id];
+  if (!name) return null;
+  const file = path.join(ringtonesDir(), name);
+  try {
+    if (!fs.existsSync(file)) return null;
+    return pathToFileURL(file).href;
+  } catch {
+    return null;
+  }
+}
+
+function positionCallCard(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    const display = screen.getPrimaryDisplay();
+    const work = display.workArea || display.bounds;
+    const [w, h] = win.getSize();
+    const margin = 16;
+    const x = Math.round(work.x + work.width - w - margin);
+    const y = Math.round(work.y + work.height - h - margin);
+    win.setPosition(x, y);
+  } catch {
+    /* ignore */
+  }
+}
+
+function ensureCallCardWindow() {
+  if (callCardWindow && !callCardWindow.isDestroyed()) return callCardWindow;
+  callCardReady = false;
+  const icon = loadAppIcon();
+  callCardWindow = new BrowserWindow({
+    width: 320,
+    height: 140,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: true,
+    backgroundColor: '#00000000',
+    title: '来电',
+    icon: icon.isEmpty() ? undefined : icon,
+    webPreferences: {
+      preload: path.join(__dirname, 'call-card-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  callCardWindow.setAlwaysOnTop(true, 'screen-saver');
+  callCardWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  callCardWindow.loadFile(path.join(__dirname, '..', 'src', 'call-card', 'index.html'));
+  callCardWindow.webContents.once('did-finish-load', () => {
+    callCardReady = true;
+  });
+  callCardWindow.on('closed', () => {
+    callCardWindow = null;
+    callCardReady = false;
+  });
+  return callCardWindow;
+}
+
+function hideCallCard() {
+  if (callCardWindow && !callCardWindow.isDestroyed()) {
+    try {
+      callCardWindow.webContents.send('call-card:hide');
+    } catch {
+      /* ignore */
+    }
+    callCardWindow.hide();
+  }
+}
+
+function showCallCard(number) {
+  const settings = getSettingsStore().getAll();
+  if (!settings.popupOnCall) {
+    hideCallCard();
+    return;
+  }
+  lastIncomingCallNumber = number || lastIncomingCallNumber;
+  const win = ensureCallCardWindow();
+  positionCallCard(win);
+  const payload = {
+    number: lastIncomingCallNumber,
+    display: displayPeer(lastIncomingCallNumber) || '未知号码',
+    ringtoneUrl: resolveRingtoneFileUrl(settings),
+    volume: typeof settings.ringtoneVolume === 'number' ? settings.ringtoneVolume : 0.85,
+  };
+  const send = () => {
+    try {
+      win.webContents.send('call-card:show', payload);
+    } catch {
+      /* ignore */
+    }
+  };
+  if (callCardReady) send();
+  else win.webContents.once('did-finish-load', send);
+  if (!win.isVisible()) win.showInactive();
+  try {
+    win.moveTop();
+  } catch {
+    /* ignore */
+  }
+}
+
+
+function resolveSmsChimeUrl() {
+  const candidates = [
+    path.join(ringtonesDir(), 'sms-chime.wav'),
+    path.join(__dirname, '..', 'assets', 'ringtones', 'sms-chime.wav'),
+  ];
+  for (const file of candidates) {
+    try {
+      if (fs.existsSync(file)) return pathToFileURL(file).href;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+function positionCornerCard(win, width = 340, height = 150) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    const display = screen.getPrimaryDisplay();
+    const work = display.workArea || display.bounds;
+    const margin = 16;
+    // stack SMS slightly above call card slot if call card visible
+    let yOffset = 0;
+    if (callCardWindow && !callCardWindow.isDestroyed() && callCardWindow.isVisible()) {
+      yOffset = 150;
+    }
+    const x = Math.round(work.x + work.width - width - margin);
+    const y = Math.round(work.y + work.height - height - margin - yOffset);
+    win.setPosition(x, y);
+  } catch {
+    /* ignore */
+  }
+}
+
+function ensureSmsCardWindow() {
+  if (smsCardWindow && !smsCardWindow.isDestroyed()) return smsCardWindow;
+  smsCardReady = false;
+  const icon = loadAppIcon();
+  smsCardWindow = new BrowserWindow({
+    width: 340,
+    height: 150,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: true,
+    backgroundColor: '#00000000',
+    title: '新短信',
+    icon: icon.isEmpty() ? undefined : icon,
+    webPreferences: {
+      preload: path.join(__dirname, 'sms-card-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  smsCardWindow.setAlwaysOnTop(true, 'screen-saver');
+  smsCardWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  smsCardWindow.loadFile(path.join(__dirname, '..', 'src', 'sms-card', 'index.html'));
+  smsCardWindow.webContents.once('did-finish-load', () => {
+    smsCardReady = true;
+  });
+  smsCardWindow.on('closed', () => {
+    smsCardWindow = null;
+    smsCardReady = false;
+  });
+  return smsCardWindow;
+}
+
+function hideSmsCard() {
+  if (smsCardHideTimer) {
+    clearTimeout(smsCardHideTimer);
+    smsCardHideTimer = null;
+  }
+  if (smsCardWindow && !smsCardWindow.isDestroyed()) {
+    try {
+      smsCardWindow.webContents.send('sms-card:hide');
+    } catch {
+      /* ignore */
+    }
+    smsCardWindow.hide();
+  }
+}
+
+function showSmsCard(message) {
+  const settings = getSettingsStore().getAll();
+  if (!settings.popupOnSms) {
+    hideSmsCard();
+    return;
+  }
+  const msg = message || {};
+  const peer = msg.sender || msg.from || msg.number || msg.peer || null;
+  const body = String(msg.body || msg.text || '');
+  const preview = body.replace(/\s+/g, ' ').trim().slice(0, 120);
+  const otps = extractOtpCodes(body);
+  const win = ensureSmsCardWindow();
+  positionCornerCard(win, 340, 150);
+  const payload = {
+    peer,
+    from: peer,
+    number: peer,
+    display: displayPeer(peer) || peer || '未知发件人',
+    body,
+    preview: preview || '(无文本)',
+    otps,
+    soundUrl: settings.smsSound ? resolveSmsChimeUrl() : null,
+    volume: typeof settings.ringtoneVolume === 'number' ? Math.min(1, settings.ringtoneVolume) : 0.7,
+  };
+  const send = () => {
+    try {
+      win.webContents.send('sms-card:show', payload);
+    } catch {
+      /* ignore */
+    }
+  };
+  if (smsCardReady) send();
+  else win.webContents.once('did-finish-load', send);
+  if (!win.isVisible()) win.showInactive();
+  try {
+    win.moveTop();
+  } catch {
+    /* ignore */
+  }
+  if (smsCardHideTimer) clearTimeout(smsCardHideTimer);
+  smsCardHideTimer = setTimeout(() => hideSmsCard(), 10000);
+}
+
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
@@ -186,6 +474,7 @@ function buildTrayMenu() {
         try {
           await modem.answer();
           stopTrayFlash();
+          hideCallCard();
           broadcastCall();
         } catch {
           /* ignore */
@@ -193,12 +482,13 @@ function buildTrayMenu() {
       },
     },
     {
-      label: '挂断',
+      label: '拒接 / 挂断',
       enabled: call.state === 'ringing' || call.state === 'active' || call.state === 'dialing',
       click: async () => {
         try {
           await modem.hangup();
           stopTrayFlash();
+          hideCallCard();
           broadcastCall();
         } catch {
           /* ignore */
@@ -298,65 +588,21 @@ function broadcastCall() {
 }
 
 function notifyIncomingCall(number) {
-  const settings = getSettingsStore().getAll();
+  // v0.8: no Windows Notification / Toast — Mac-like corner card + ringtone only
   lastIncomingCallNumber = number || lastIncomingCallNumber;
-
-  if (settings.popupOnCall && mainWindow && !mainWindow.isDestroyed()) {
-    const focused = mainWindow.isVisible() && mainWindow.isFocused();
-    if (focused || mainWindow.isVisible()) {
-      mainWindow.webContents.send('call:incoming-popup', {
-        number: lastIncomingCallNumber,
-        display: displayPeer(lastIncomingCallNumber),
-      });
-    }
-  }
-
-  if (!settings.notifyOnCall) return;
-  if (!Notification.isSupported()) return;
-
-  const body = displayPeer(lastIncomingCallNumber) || '未知号码';
-  const opts = {
-    title: '来电',
-    body: `来自 ${body}`,
-    silent: false,
-  };
-  // Actions: supported on some platforms; Windows may ignore — fallback is click.
-  try {
-    opts.actions = [
-      { type: 'button', text: '接听' },
-      { type: 'button', text: '挂断' },
-    ];
-  } catch {
-    /* ignore */
-  }
-
-  let n;
-  try {
-    n = new Notification(opts);
-  } catch {
-    n = new Notification({ title: '来电', body: `来自 ${body}` });
-  }
-
-  n.on('click', () => {
-    showMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('call:incoming-popup', {
-        number: lastIncomingCallNumber,
-        display: displayPeer(lastIncomingCallNumber),
-      });
-    }
-  });
-  n.on('action', async (_e, index) => {
+  showCallCard(lastIncomingCallNumber);
+  // Optionally nudge main window overlay demoted: still send event if visible (compat)
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
     try {
-      if (index === 0) await modem.answer();
-      else if (index === 1) await modem.hangup();
-      stopTrayFlash();
-      broadcastCall();
+      mainWindow.webContents.send('call:incoming-popup', {
+        number: lastIncomingCallNumber,
+        display: displayPeer(lastIncomingCallNumber),
+        demoted: true,
+      });
     } catch {
       /* ignore */
     }
-  });
-  n.show();
+  }
 }
 
 function applyLoginItem(settings) {
@@ -379,18 +625,25 @@ modem.setUrcHandler((payload) => {
       const num = payload.clip || payload.number || null;
       notifyIncomingCall(num);
       startTrayFlash();
-      // If window hidden (tray), still try popup when shown and toast above
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-        // toast already fired; tray menu updated
-      }
     } else if (payload.state === 'idle' || payload.state === 'active' || payload.state === 'ending') {
       stopTrayFlash();
+      hideCallCard();
     }
   }
   if (payload && payload.type === 'CMTI') {
-    // New inbound SMS — renderer will refresh; nudge unread via threads IPC optional
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('sms:new-inbound', payload);
+    }
+  }
+  if (payload && payload.type === 'SMS_NEW') {
+    const message = payload.message || payload;
+    showSmsCard(message);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sms:new-inbound', {
+        type: 'SMS_NEW',
+        peer: message.sender || message.from || null,
+        message,
+      });
     }
   }
 });
@@ -426,6 +679,7 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   isQuitting = true;
   stopTrayFlash();
+  hideCallCard();
 });
 
 app.on('window-all-closed', () => {
@@ -452,6 +706,70 @@ ipcMain.handle('settings:set', async (_evt, partial) => {
   applyLoginItem(next);
   return { ok: true, settings: next };
 });
+
+ipcMain.handle('ringtone:resolve', async () => {
+  const settings = getSettingsStore().getAll();
+  return {
+    ok: true,
+    ringtone: settings.ringtone,
+    volume: settings.ringtoneVolume,
+    url: resolveRingtoneFileUrl(settings),
+    customPath: settings.customRingtonePath || '',
+  };
+});
+
+ipcMain.handle('ringtone:pickCustom', async () => {
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  const result = await dialog.showOpenDialog(win || undefined, {
+    title: '选择自定义铃声（仅本机路径）',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'aac', 'flac', 'wma'] },
+      { name: 'All', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || !result.filePaths || !result.filePaths[0]) {
+    return { ok: false, canceled: true, settings: getSettingsStore().getAll() };
+  }
+  const chosen = result.filePaths[0];
+  const next = getSettingsStore().set({
+    ringtone: 'custom',
+    customRingtonePath: chosen,
+  });
+  return {
+    ok: true,
+    path: chosen,
+    settings: next,
+    url: resolveRingtoneFileUrl(next),
+  };
+});
+
+ipcMain.handle('ringtone:clearCustom', async () => {
+  const next = getSettingsStore().set({
+    customRingtonePath: '',
+    ringtone: 'apple',
+  });
+  return { ok: true, settings: next };
+});
+
+ipcMain.handle('sms-card:dismiss', async () => {
+  hideSmsCard();
+  return { ok: true };
+});
+
+ipcMain.handle('sms-card:open', async (_evt, payload) => {
+  hideSmsCard();
+  showMainWindow();
+  const peer = payload && (payload.peer || payload.from || payload.number);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('sms:open-thread', {
+      peer: peer || null,
+      display: displayPeer(peer),
+    });
+  }
+  return { ok: true, peer: peer || null };
+});
+
 
 ipcMain.handle('app:showMain', async () => {
   showMainWindow();
@@ -705,6 +1023,7 @@ ipcMain.handle('call:answer', async () => {
   try {
     const result = await modem.answer();
     stopTrayFlash();
+    hideCallCard();
     refreshTrayMenu();
     return { ok: true, ...result, status: enrichStatus(result.status) };
   } catch (err) {
@@ -716,6 +1035,7 @@ ipcMain.handle('call:hangup', async () => {
   try {
     const result = await modem.hangup();
     stopTrayFlash();
+    hideCallCard();
     refreshTrayMenu();
     return { ok: true, ...result, status: enrichStatus(result.status) };
   } catch (err) {

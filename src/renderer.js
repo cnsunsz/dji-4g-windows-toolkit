@@ -9,7 +9,7 @@ const VIEW_META = {
   call: { title: '通话', sub: '实验功能 · AT 语音控制 · 音频路径视固件而定' },
   drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC' },
   diag: { title: '诊断', sub: 'USB / AT 口 · AT 控制台 · IMS' },
-  settings: { title: '设置', sub: '开机启动 · 托盘 · 来电通知 / 弹窗 · 自动连接' },
+  settings: { title: '设置', sub: '开机启动 · 托盘 · 来电/短信角标 · 铃声 · 自动连接' },
 };
 
 const CALL_STATE_LABEL = {
@@ -369,12 +369,10 @@ function paintCall(s) {
     }
   }
 
-  // Hide popup when call leaves ringing
+  // Corner call-card BrowserWindow (main process) is primary UI even when minimized/tray
   if (state !== 'ringing') {
     hideCallPopup();
     popupIgnored = false;
-  } else if (!popupIgnored && settingsCache && settingsCache.popupOnCall) {
-    showCallPopup(s.callClip || s.callNumber || '—');
   }
 }
 
@@ -854,14 +852,29 @@ function paintSettings(s) {
   const map = {
     setOpenAtLogin: 'openAtLogin',
     setCloseToTray: 'closeToTray',
-    setNotifyOnCall: 'notifyOnCall',
     setPopupOnCall: 'popupOnCall',
+    setPopupOnSms: 'popupOnSms',
+    setSmsSound: 'smsSound',
     setAutoConnect: 'autoConnect',
     setFlashTrayOnRing: 'flashTrayOnRing',
   };
   for (const [id, key] of Object.entries(map)) {
     const el = $(id);
     if (el) el.checked = !!settingsCache[key];
+  }
+  const ringSel = $('setRingtone');
+  if (ringSel) ringSel.value = settingsCache.ringtone || 'apple';
+  const vol = $('setRingtoneVolume');
+  if (vol) {
+    const v = typeof settingsCache.ringtoneVolume === 'number' ? settingsCache.ringtoneVolume : 0.85;
+    vol.value = String(Math.round(v * 100));
+  }
+  const pathLabel = $('customRingtonePathLabel');
+  if (pathLabel) {
+    const cp = settingsCache.customRingtonePath || '';
+    pathLabel.textContent = cp
+      ? cp
+      : '未选择（文件留在您的电脑上，不会上传或打进 Release）';
   }
 }
 
@@ -873,23 +886,68 @@ async function loadSettings() {
     paintSettings({
       openAtLogin: false,
       closeToTray: true,
-      notifyOnCall: true,
+      notifyOnCall: false,
       popupOnCall: true,
+      popupOnSms: true,
+      smsSound: true,
       autoConnect: true,
       flashTrayOnRing: true,
+      ringtone: 'apple',
+      ringtoneVolume: 0.85,
+      customRingtonePath: '',
     });
   }
 }
 
 async function saveSetting(key, value) {
   try {
-    const result = await window.toolkit.setSettings({ [key]: !!value });
+    const result = await window.toolkit.setSettings({ [key]: value });
     if (result && result.settings) paintSettings(result.settings);
     const note = $('settingsSaveNote');
     if (note) note.textContent = '已保存并立即生效。';
+    return result;
   } catch (e) {
     const note = $('settingsSaveNote');
     if (note) note.textContent = '保存失败: ' + (e.message || e);
+    return null;
+  }
+}
+
+function stopRingtonePreview() {
+  try {
+    const el = $('ringtonePreview');
+    if (el) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+    }
+  } catch (_) {}
+}
+
+async function previewRingtone() {
+  stopRingtonePreview();
+  try {
+    const info = await window.toolkit.resolveRingtone();
+    if (!info || !info.url) {
+      const note = $('settingsSaveNote');
+      if (note) {
+        note.textContent = (settingsCache && settingsCache.ringtone === 'mute')
+          ? '当前为静音。'
+          : '无法试听：请先选择有效铃声或自定义文件。';
+      }
+      return;
+    }
+    const el = $('ringtonePreview');
+    if (!el) return;
+    el.loop = false;
+    el.volume = typeof info.volume === 'number' ? info.volume : 0.85;
+    el.src = info.url;
+    const p = el.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+    setTimeout(() => stopRingtonePreview(), 4000);
+  } catch (e) {
+    const note = $('settingsSaveNote');
+    if (note) note.textContent = '试听失败: ' + (e.message || e);
   }
 }
 
@@ -954,10 +1012,9 @@ async function init() {
     });
   }
   if (window.toolkit.onIncomingCallPopup) {
-    window.toolkit.onIncomingCallPopup((payload) => {
-      if (settingsCache && settingsCache.popupOnCall === false) return;
-      if (popupIgnored) return;
-      showCallPopup((payload && (payload.display || payload.number)) || '—');
+    window.toolkit.onIncomingCallPopup((_payload) => {
+      // v0.8: dedicated always-on-top corner window handles UI (works when minimized/tray)
+      hideCallPopup();
     });
   }
   if (window.toolkit.onNewInboundSms) {
@@ -965,13 +1022,24 @@ async function init() {
       if (!busy) refreshSms();
     });
   }
+  if (window.toolkit.onOpenSmsThread) {
+    window.toolkit.onOpenSmsThread(async (payload) => {
+      try {
+        switchView('sms');
+        if (!busy) await refreshSms();
+        const peer = payload && payload.peer;
+        if (peer) await selectThread(peer);
+      } catch (_) {}
+    });
+  }
 
   // Settings checkboxes
   const settingBind = [
     ['setOpenAtLogin', 'openAtLogin'],
     ['setCloseToTray', 'closeToTray'],
-    ['setNotifyOnCall', 'notifyOnCall'],
     ['setPopupOnCall', 'popupOnCall'],
+    ['setPopupOnSms', 'popupOnSms'],
+    ['setSmsSound', 'smsSound'],
     ['setAutoConnect', 'autoConnect'],
     ['setFlashTrayOnRing', 'flashTrayOnRing'],
   ];
@@ -979,6 +1047,60 @@ async function init() {
     const el = $(id);
     if (!el) continue;
     el.addEventListener('change', () => saveSetting(key, el.checked));
+  }
+
+  const ringSel = $('setRingtone');
+  if (ringSel) {
+    ringSel.addEventListener('change', async () => {
+      const val = ringSel.value;
+      if (val === 'custom') {
+        if (window.toolkit.pickCustomRingtone) {
+          const result = await window.toolkit.pickCustomRingtone();
+          if (result && result.settings) paintSettings(result.settings);
+          else await saveSetting('ringtone', 'custom');
+        } else {
+          await saveSetting('ringtone', 'custom');
+        }
+      } else {
+        await saveSetting('ringtone', val);
+      }
+    });
+  }
+  const volEl = $('setRingtoneVolume');
+  if (volEl) {
+    volEl.addEventListener('change', () => {
+      const v = Math.max(0, Math.min(100, Number(volEl.value) || 0)) / 100;
+      saveSetting('ringtoneVolume', v);
+    });
+  }
+  if ($('btnPreviewRingtone')) {
+    $('btnPreviewRingtone').onclick = () => previewRingtone();
+  }
+  if ($('btnPickRingtone')) {
+    $('btnPickRingtone').onclick = async () => {
+      try {
+        const result = await window.toolkit.pickCustomRingtone();
+        if (result && result.settings) paintSettings(result.settings);
+        const note = $('settingsSaveNote');
+        if (note && result && result.ok) note.textContent = '已选择本机自定义铃声（仅保存路径）。';
+      } catch (e) {
+        const note = $('settingsSaveNote');
+        if (note) note.textContent = '选择失败: ' + (e.message || e);
+      }
+    };
+  }
+  if ($('btnClearRingtone')) {
+    $('btnClearRingtone').onclick = async () => {
+      try {
+        const result = await window.toolkit.clearCustomRingtone();
+        if (result && result.settings) paintSettings(result.settings);
+        const note = $('settingsSaveNote');
+        if (note) note.textContent = '已清除自定义路径，恢复苹果风。';
+      } catch (e) {
+        const note = $('settingsSaveNote');
+        if (note) note.textContent = '清除失败: ' + (e.message || e);
+      }
+    };
   }
 
   $('ussdPreset').onchange = () => {

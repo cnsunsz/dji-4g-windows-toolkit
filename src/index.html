@@ -321,7 +321,7 @@
         </section>
 
         <!-- Settings -->
-        <section class="view" id="view-settings" data-title="设置" data-sub="开机启动 · 托盘 · 来电通知 / 弹窗 · 自动连接">
+        <section class="view" id="view-settings" data-title="设置" data-sub="开机启动 · 托盘 · 来电/短信角标 · 铃声 · 自动连接">
           <div class="panel">
             <div class="panel-head">
               <div>
@@ -375,15 +375,8 @@
             <div class="settings-list">
               <label class="settings-row">
                 <div>
-                  <strong>来电时系统通知</strong>
-                  <span>Windows 通知中心 Toast（支持时含接听/挂断操作）</span>
-                </div>
-                <input type="checkbox" id="setNotifyOnCall">
-              </label>
-              <label class="settings-row">
-                <div>
-                  <strong>来电弹窗</strong>
-                  <span>应用内 Mac 风格弹层：接听 / 挂断 / 忽略</span>
+                  <strong>来电角标卡片</strong>
+                  <span>屏幕右下角常置顶小窗（Mac 风格）：接听 / 拒接；主窗口最小化时仍可用</span>
                 </div>
                 <input type="checkbox" id="setPopupOnCall">
               </label>
@@ -394,8 +387,56 @@
                 </div>
                 <input type="checkbox" id="setFlashTrayOnRing">
               </label>
+              <div class="settings-row">
+                <div>
+                  <strong>来电铃声</strong>
+                  <span>自研风格示意（非官方原版铃声）。也可选用本机自定义音频文件（仅保存路径，不打包进安装包）。</span>
+                </div>
+                <div class="ringtone-controls">
+                  <select id="setRingtone" class="theme-select" aria-label="来电铃声">
+                    <option value="mute">静音</option>
+                    <option value="apple">苹果风</option>
+                    <option value="xiaomi">小米风</option>
+                    <option value="samsung">三星风</option>
+                    <option value="custom">自定义文件…</option>
+                  </select>
+                  <button type="button" class="btn ghost compact" id="btnPreviewRingtone">试听</button>
+                </div>
+              </div>
+              <div class="settings-row" id="customRingtoneRow">
+                <div>
+                  <strong>自定义铃声文件</strong>
+                  <span id="customRingtonePathLabel">未选择（文件留在您的电脑上，不会上传或打进 Release）</span>
+                </div>
+                <div class="ringtone-controls">
+                  <button type="button" class="btn ghost compact" id="btnPickRingtone">选择文件</button>
+                  <button type="button" class="btn ghost compact" id="btnClearRingtone">清除</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div>
+                  <strong>铃声音量</strong>
+                  <span>仅影响来电铃声与试听</span>
+                </div>
+                <input type="range" id="setRingtoneVolume" min="0" max="100" value="85" aria-label="铃声音量">
+              </div>
+              <label class="settings-row">
+                <div>
+                  <strong>新短信角标卡片</strong>
+                  <span>屏幕右下角常置顶小窗（主窗口最小化/托盘时仍显示）：打开 / 关闭；含验证码时可复制</span>
+                </div>
+                <input type="checkbox" id="setPopupOnSms">
+              </label>
+              <label class="settings-row">
+                <div>
+                  <strong>新短信提示音</strong>
+                  <span>自研短促提示音（非系统 Toast）</span>
+                </div>
+                <input type="checkbox" id="setSmsSound">
+              </label>
             </div>
-            <p class="muted-line" id="settingsSaveNote" style="margin-top:12px">设置保存在本机 userData，立即生效。</p>
+            <p class="muted-line" style="margin-top:8px">说明：苹果风 / 小米风 / 三星风为<strong>自研合成</strong>的短循环示意音，并非 Apple / 小米 / 三星官方原版铃声。自定义铃声仅保存本机路径，不会打进安装包。</p>
+            <p class="muted-line" id="settingsSaveNote" style="margin-top:8px">设置保存在本机 userData，立即生效。系统通知中心 Toast 已移除。</p>
           </div>
         </section>
 
@@ -403,20 +444,21 @@
     </div>
   </div>
 
-  <!-- Incoming call overlay -->
+  <!-- Legacy centered overlay kept hidden; v0.8 primary UI is corner call-card window -->
   <div id="callPopup" class="call-popup" hidden role="dialog" aria-modal="true" aria-labelledby="callPopupNumber">
     <div class="call-popup-card">
       <div class="call-popup-avatar" aria-hidden="true">☎</div>
       <p class="call-popup-kicker">来电</p>
       <h2 id="callPopupNumber">—</h2>
-      <p class="call-popup-sub" id="callPopupSub">振铃中…</p>
+      <p class="call-popup-sub" id="callPopupSub">请使用右下角来电卡片</p>
       <div class="call-popup-actions">
         <button type="button" class="btn call-answer" id="btnPopupAnswer">接听</button>
-        <button type="button" class="btn call-decline" id="btnPopupHangup">挂断</button>
+        <button type="button" class="btn call-decline" id="btnPopupHangup">拒接</button>
         <button type="button" class="btn ghost" id="btnPopupIgnore">忽略</button>
       </div>
     </div>
   </div>
+  <audio id="ringtonePreview" preload="none"></audio>
 
   <script src="renderer.js"></script>
 </body>

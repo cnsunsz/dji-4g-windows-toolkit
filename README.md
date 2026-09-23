@@ -14,9 +14,9 @@
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS：默认一键安装 `qcser` / `qcmdm` / `qcfilter`；可选单独安装 **`qcwwan`** 作为上网（WWAN/NDIS）驱动（非大疆官方独立包，可能覆盖百旺/大疆已有 WWAN）
 3. **短信会话（PDU，v0.6）**：按对端号码聚合线程（规范化 `+86` / 首位 `0`）；左侧会话列表 + 右侧聊天气泡（收到靠左灰、发出靠右蓝，接近 iMessage）；成功发送后把**出站短信**持久化到 `userData`（按 ICCID）；与模组 PDU 收件箱合并；未读角标（`+CMTI` / 轮询）；会话内删除 / 清空会话；仍支持清空 SM。**默认不自动删除**短信。**v0.7**：自动识别短信中的 4–8 位验证码，气泡内显示可一键复制的芯片
 4. **本机号码（v0.5）**：`AT+CNUM` 若有则优先显示；否则按 **ICCID** 持久化用户填写的 MSISDN（`userData/msisdn-by-iccid.json`）。概览与短信页顶栏显示有效号码；支持 **USSD 查号** 与从近期短信扫描大陆手机号。**不宣称 CNUM 在空返回时可用**
-5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.6**：来电时应用内弹层（接听 / 挂断 / 忽略）+ 可选 Windows Toast；托盘菜单亦可接听/挂断
+5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.8**：来电改为屏幕右下角 Mac 风格常置顶角标（接听 / 拒接），**不再**使用系统 Toast；自研风格铃声（苹果风/小米风/三星风/静音）+ 可选本机自定义铃声路径；托盘菜单仍可接听/挂断
 6. **托盘与后台（v0.6）**：系统托盘；默认关闭窗口时最小化到托盘（模组保持连接）；托盘菜单：显示主窗口 / 接听 / 挂断 / 退出
-7. **设置页（v0.6）**：开机启动、关闭到托盘、来电系统通知、来电弹窗、启动自动连接模组、托盘闪烁提示（均持久化到 `userData/settings.json`）
+7. **设置页（v0.8）**：开机启动、关闭到托盘、来电角标、来电铃声（自研风格示意 / 本机自定义路径）、短信角标与提示音、启动自动连接、托盘闪烁（`userData/settings.json`）。系统 Toast 已移除
 8. **概览状态板**（含 USB/适配器提示）+ **启用 IMS**（可选软重启）
 9. **诊断 · AT 控制台（v0.7）**：网页式单行 AT 调试（预设 CSQ/COPS/IMS/QCCID 等）；eSIM 仅占位「即将支持」
 
@@ -29,7 +29,7 @@
 | 未读 | 会话列表角标 / 侧栏红点；点开会话即标记已读 |
 | 关窗不退出 | **设置** 打开「关闭窗口时最小化到托盘」→ 关窗后托盘图标仍在，模组不断开 |
 | 开机启动 | **设置** → 「开机启动」 |
-| 来电 | Toast 通知 + 应用内弹窗；托盘右键也可接听/挂断 |
+| 来电 | 右下角常置顶角标（最小化/托盘时也能用）+ 自研铃声；托盘右键也可接听/挂断 |
 
 ### 国内移动卡 / 本机号码
 
@@ -56,8 +56,8 @@
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.7.0
-   git push origin v0.7.0
+   git tag v0.8.0
+   git push origin v0.8.0
    ```
 2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版，并创建 GitHub Release
 3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行
@@ -168,3 +168,10 @@ scripts/generate-icon.py 图标生成（Pillow）
 **Release:** push `v*` tag → Actions builds on `windows-latest` → Release assets.
 
 Not affiliated with DJI or Quectel. MIT for first-party code; no PolyForm Noncommercial source copied.
+
+
+## 铃声与短信角标（v0.8）
+
+- 内置「苹果风 / 小米风 / 三星风」为**自研合成**短循环示意音，**不是**各品牌官方原版铃声。
+- 「自定义文件」只把本机绝对路径写入设置；文件留在您的电脑上，不会打进安装包或上传。
+- 来电与新短信均使用屏幕右下角常置顶小窗，**不**走 Windows 通知中心 Toast。
