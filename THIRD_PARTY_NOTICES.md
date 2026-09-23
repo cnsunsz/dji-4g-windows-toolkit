@@ -65,6 +65,7 @@ Required notice (inspiration credit only — we do **not** redistribute their co
 
 - Electron — see Electron / Chromium / Node license notices shipped by Electron
 - serialport — MIT
+- **phone2region** `0.0.3` — MIT (ibug@mail.com / iBugCode). Offline CN mobile 归属地 lookup via bundled `phone.dat`. Data is approximate and may be outdated (number portability / new segments). See package LICENSE.
 - electron-builder (dev / Windows build) — MIT
 
 Exact versions: see `package.json` / `package-lock.json` after `npm install`.

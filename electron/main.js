@@ -25,6 +25,7 @@ const {
 const { SettingsStore } = require('../src/settings-store');
 const { SmsThreadStore, buildThreads } = require('../src/sms-thread-store');
 const { normalizePeer, displayPeer } = require('../src/phone-normalize');
+const { lookupPhoneRegion, extractCnMobile } = require('../src/phone-region');
 const { extractOtpCodes } = require('../src/otp');
 
 // Windows jump-list / taskbar identity (toasts for calls removed in v0.8)
@@ -203,8 +204,8 @@ function ensureCallCardWindow() {
   callCardReady = false;
   const icon = loadAppIcon();
   callCardWindow = new BrowserWindow({
-    width: 320,
-    height: 140,
+    width: 390,
+    height: 168,
     show: false,
     frame: false,
     transparent: true,
@@ -258,9 +259,14 @@ function showCallCard(number) {
   lastIncomingCallNumber = number || lastIncomingCallNumber;
   const win = ensureCallCardWindow();
   positionCallCard(win);
+  const regionInfo = lookupPhoneRegion(lastIncomingCallNumber);
+  const isCnMobile = Boolean(extractCnMobile(lastIncomingCallNumber));
   const payload = {
     number: lastIncomingCallNumber,
     display: displayPeer(lastIncomingCallNumber) || '未知号码',
+    region: regionInfo.text,
+    '归属地': regionInfo.text,
+    regionUnknown: Boolean(isCnMobile && !regionInfo.text),
     ringtoneUrl: resolveRingtoneFileUrl(settings),
     volume: typeof settings.ringtoneVolume === 'number' ? settings.ringtoneVolume : 0.85,
   };
@@ -297,7 +303,7 @@ function resolveSmsChimeUrl() {
   return null;
 }
 
-function positionCornerCard(win, width = 340, height = 150) {
+function positionCornerCard(win, width = 380, height = 168) {
   if (!win || win.isDestroyed()) return;
   try {
     const display = screen.getPrimaryDisplay();
@@ -306,7 +312,7 @@ function positionCornerCard(win, width = 340, height = 150) {
     // stack SMS slightly above call card slot if call card visible
     let yOffset = 0;
     if (callCardWindow && !callCardWindow.isDestroyed() && callCardWindow.isVisible()) {
-      yOffset = 150;
+      yOffset = 176;
     }
     const x = Math.round(work.x + work.width - width - margin);
     const y = Math.round(work.y + work.height - height - margin - yOffset);
@@ -321,8 +327,8 @@ function ensureSmsCardWindow() {
   smsCardReady = false;
   const icon = loadAppIcon();
   smsCardWindow = new BrowserWindow({
-    width: 340,
-    height: 150,
+    width: 380,
+    height: 168,
     show: false,
     frame: false,
     transparent: true,
@@ -383,12 +389,15 @@ function showSmsCard(message) {
   const preview = body.replace(/\s+/g, ' ').trim().slice(0, 120);
   const otps = extractOtpCodes(body);
   const win = ensureSmsCardWindow();
-  positionCornerCard(win, 340, 150);
+  positionCornerCard(win, 380, 168);
+  const regionInfo = lookupPhoneRegion(peer);
   const payload = {
     peer,
     from: peer,
     number: peer,
     display: displayPeer(peer) || peer || '未知发件人',
+    region: regionInfo.text,
+    '归属地': regionInfo.text,
     body,
     preview: preview || '(无文本)',
     otps,

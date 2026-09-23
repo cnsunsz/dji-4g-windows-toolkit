@@ -14,7 +14,7 @@
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS：默认一键安装 `qcser` / `qcmdm` / `qcfilter`；可选单独安装 **`qcwwan`** 作为上网（WWAN/NDIS）驱动（非大疆官方独立包，可能覆盖百旺/大疆已有 WWAN）
 3. **短信会话（PDU，v0.6）**：按对端号码聚合线程（规范化 `+86` / 首位 `0`）；左侧会话列表 + 右侧聊天气泡（收到靠左灰、发出靠右蓝，接近 iMessage）；成功发送后把**出站短信**持久化到 `userData`（按 ICCID）；与模组 PDU 收件箱合并；未读角标（`+CMTI` / 轮询）；会话内删除 / 清空会话；仍支持清空 SM。**默认不自动删除**短信。**v0.7**：自动识别短信中的 4–8 位验证码，气泡内显示可一键复制的芯片
 4. **本机号码（v0.5）**：`AT+CNUM` 若有则优先显示；否则按 **ICCID** 持久化用户填写的 MSISDN（`userData/msisdn-by-iccid.json`）。概览与短信页顶栏显示有效号码；支持 **USSD 查号** 与从近期短信扫描大陆手机号。**不宣称 CNUM 在空返回时可用**
-5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.8**：来电改为屏幕右下角 Mac 风格常置顶角标（接听 / 拒接），**不再**使用系统 Toast；自研风格铃声（苹果风/小米风/三星风/静音）+ 可选本机自定义铃声路径；托盘菜单仍可接听/挂断
+5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.8 / v0.8.1**：来电改为屏幕右下角 Mac 风格常置顶角标（接听 / 拒接），**不再**使用系统 Toast；完整显示主叫号码；离线显示大陆号 **归属地**（省/市/运营商，数据近似）；自研风格铃声（苹果风/小米风/三星风/静音）+ 可选本机自定义铃声路径；托盘菜单仍可接听/挂断
 6. **托盘与后台（v0.6）**：系统托盘；默认关闭窗口时最小化到托盘（模组保持连接）；托盘菜单：显示主窗口 / 接听 / 挂断 / 退出
 7. **设置页（v0.8）**：开机启动、关闭到托盘、来电角标、来电铃声（自研风格示意 / 本机自定义路径）、短信角标与提示音、启动自动连接、托盘闪烁（`userData/settings.json`）。系统 Toast 已移除
 8. **概览状态板**（含 USB/适配器提示）+ **启用 IMS**（可选软重启）
@@ -129,6 +129,7 @@ src/msisdn-store.js      按 ICCID 持久化本机号码
 src/sms-thread-store.js  按 ICCID 持久化出站短信 + 线程合并
 src/settings-store.js    应用设置持久化
 src/phone-normalize.js   对端号码规范化（+86 / 首位 0）
+src/phone-region.js      离线大陆号归属地（phone2region）
 src/pdu.js               MIT 自研 SMS PDU 编解码
 src/driver.js            捆绑驱动路径 + 提权安装
 scripts/Install-Drivers.ps1
@@ -170,8 +171,9 @@ scripts/generate-icon.py 图标生成（Pillow）
 Not affiliated with DJI or Quectel. MIT for first-party code; no PolyForm Noncommercial source copied.
 
 
-## 铃声与短信角标（v0.8）
+## 铃声、角标与归属地（v0.8 / v0.8.1）
 
 - 内置「苹果风 / 小米风 / 三星风」为**自研合成**短循环示意音，**不是**各品牌官方原版铃声。
 - 「自定义文件」只把本机绝对路径写入设置；文件留在您的电脑上，不会打进安装包或上传。
 - 来电与新短信均使用屏幕右下角常置顶小窗，**不**走 Windows 通知中心 Toast。
+- **v0.8.1**：来电/短信角标完整显示号码；大陆 11 位 / `+86` 号码离线查询 **归属地**（`phone2region` MIT，`phone.dat`；近似且可能过时，携号转网后运营商可能不准）。

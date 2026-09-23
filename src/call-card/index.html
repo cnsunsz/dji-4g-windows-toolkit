@@ -44,14 +44,14 @@
       border: 1px solid var(--line);
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
       display: grid;
-      grid-template-columns: 44px 1fr auto;
-      grid-template-rows: auto auto;
-      gap: 4px 12px;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      grid-template-rows: auto auto auto;
+      gap: 2px 12px;
       align-items: center;
       color: var(--ink);
     }
     .avatar {
-      grid-row: 1 / span 2;
+      grid-row: 1 / span 3;
       width: 44px;
       height: 44px;
       border-radius: 50%;
@@ -62,6 +62,7 @@
       background: linear-gradient(180deg, #34c759, #248a3d);
       color: #fff;
       box-shadow: 0 4px 12px rgba(52, 199, 89, 0.35);
+      align-self: center;
     }
     .kicker {
       margin: 0;
@@ -72,17 +73,29 @@
     }
     .number {
       margin: 0;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 650;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 150px;
+      line-height: 1.25;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+      /* Prefer full MSISDN; only extreme lengths wrap — no mid-number ellipsis */
     }
+    .region {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      line-height: 1.3;
+      word-break: break-word;
+      min-height: 1.3em;
+    }
+    .region[hidden] { display: none; }
     .actions {
-      grid-row: 1 / span 2;
+      grid-row: 1 / span 3;
       display: flex;
       gap: 8px;
+      align-self: center;
       -webkit-app-region: no-drag;
     }
     button {
@@ -111,6 +124,7 @@
       <button type="button" class="reject" id="btnReject">拒接</button>
     </div>
     <h1 class="number" id="callerNumber">—</h1>
+    <p class="region" id="callerRegion" hidden></p>
   </div>
   <audio id="ringAudio" loop preload="auto"></audio>
   <script src="call-card.js"></script>

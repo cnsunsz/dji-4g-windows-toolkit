@@ -1,6 +1,7 @@
 'use strict';
 
 const fromEl = document.getElementById('smsFrom');
+const regionEl = document.getElementById('smsRegion');
 const previewEl = document.getElementById('smsPreview');
 const otpRow = document.getElementById('otpRow');
 const audioEl = document.getElementById('smsAudio');
@@ -54,10 +55,23 @@ function paintOtps(codes) {
   }
 }
 
+function paintRegion(payload) {
+  const text =
+    (payload && (payload.region || payload['归属地'] || payload.regionText)) || '';
+  if (text) {
+    regionEl.hidden = false;
+    regionEl.textContent = text;
+  } else {
+    regionEl.hidden = true;
+    regionEl.textContent = '';
+  }
+}
+
 if (window.smsCard) {
   window.smsCard.onShow((payload) => {
     currentPeer = (payload && (payload.peer || payload.from || payload.number)) || null;
     fromEl.textContent = (payload && (payload.display || payload.from || payload.number)) || '未知发件人';
+    paintRegion(payload || {});
     previewEl.textContent = (payload && (payload.preview || payload.body || '')) || '';
     paintOtps(payload && payload.otps);
     playSound(payload || {});

@@ -1,6 +1,7 @@
 'use strict';
 
 const numberEl = document.getElementById('callerNumber');
+const regionEl = document.getElementById('callerRegion');
 const audioEl = document.getElementById('ringAudio');
 const btnAnswer = document.getElementById('btnAnswer');
 const btnReject = document.getElementById('btnReject');
@@ -26,10 +27,27 @@ function startRingtone(payload) {
   if (p && typeof p.catch === 'function') p.catch(() => {});
 }
 
+function paintRegion(payload) {
+  const text =
+    (payload && (payload.region || payload['归属地'] || payload.regionText)) || '';
+  const showUnknown = payload && payload.regionUnknown === true;
+  if (text) {
+    regionEl.hidden = false;
+    regionEl.textContent = text;
+  } else if (showUnknown) {
+    regionEl.hidden = false;
+    regionEl.textContent = '归属地未知';
+  } else {
+    regionEl.hidden = true;
+    regionEl.textContent = '';
+  }
+}
+
 if (window.callCard) {
   window.callCard.onShow((payload) => {
     const display = (payload && (payload.display || payload.number)) || '未知号码';
     numberEl.textContent = display;
+    paintRegion(payload || {});
     startRingtone(payload || {});
   });
   window.callCard.onHide(() => {

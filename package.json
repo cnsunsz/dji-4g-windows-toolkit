@@ -1,7 +1,7 @@
 {
   "name": "dji-4g-windows-toolkit",
-  "version": "0.8.0",
-  "description": "DJI 4G Windows Toolkit — Electron: Quectel drivers, PDU SMS threads with OTP chips, Mac-like corner call/SMS cards, original style ringtones + custom path, AT console",
+  "version": "0.8.1",
+  "description": "DJI 4G Windows Toolkit — Electron: Quectel drivers, PDU SMS threads with OTP chips, Mac-like corner call/SMS cards with CN 归属地, original style ringtones + custom path, AT console",
   "main": "electron/main.js",
   "author": "cnsunsz",
   "license": "MIT",
@@ -17,9 +17,11 @@
     "check:pdu": "node scripts/check-pdu.js",
     "check:threads": "node scripts/check-threads.js",
     "generate:icon": "python3 scripts/generate-icon.py",
-    "check:otp": "node scripts/check-otp.js"
+    "check:otp": "node scripts/check-otp.js",
+    "check:region": "node scripts/check-region.js"
   },
   "dependencies": {
+    "phone2region": "0.0.3",
     "serialport": "^12.0.0"
   },
   "devDependencies": {
