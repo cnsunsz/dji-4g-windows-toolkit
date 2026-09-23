@@ -4,11 +4,11 @@ const $ = (id) => document.getElementById(id);
 
 const THEME_KEY = 'dji4g-toolkit-theme';
 const VIEW_META = {
-  overview: { title: '模块概览', sub: '运营商 / 信号 / SIM / IMS / 本机号码' },
+  overview: { title: '模块概览', sub: '运营商、信号、SIM、IMS 与适配器' },
   sms: { title: '短信', sub: '会话线程 · PDU 收发 · 本地已发送持久化' },
   call: { title: '通话', sub: '实验功能 · AT 语音控制 · 音频路径视固件而定' },
   drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC' },
-  diag: { title: '诊断', sub: 'USB / AT 口 / ATI · IMS 启用' },
+  diag: { title: '诊断', sub: 'USB / AT 口 · AT 控制台 · IMS' },
   settings: { title: '设置', sub: '开机启动 · 托盘 · 来电通知 / 弹窗 · 自动连接' },
 };
 
@@ -57,6 +57,7 @@ function setBusy(isBusy) {
     'btnTryQpcmv',
     'btnPopupAnswer',
     'btnPopupHangup',
+    'btnAtSend',
   ]) {
     const el = $(id);
     if (el) el.disabled = isBusy;
@@ -69,19 +70,114 @@ function appendLog(el, text) {
   el.scrollTop = el.scrollHeight;
 }
 
-function applyTheme(theme) {
-  const next = theme === 'dark' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', next);
+function getThemePref() {
   try {
-    localStorage.setItem(THEME_KEY, next);
+    const v = localStorage.getItem(THEME_KEY);
+    if (v === 'dark' || v === 'light' || v === 'system') return v;
+  } catch (_) {}
+  return 'system';
+}
+
+function resolveTheme(pref) {
+  const p = pref || getThemePref();
+  if (p === 'dark' || p === 'light') return p;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  } catch (_) {}
+  return 'light';
+}
+
+function themeLabel(pref) {
+  if (pref === 'dark') return '深色';
+  if (pref === 'light') return '浅色';
+  return '跟随系统';
+}
+
+function applyTheme(pref) {
+  const choice = pref === 'dark' || pref === 'light' || pref === 'system' ? pref : 'system';
+  const resolved = resolveTheme(choice);
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute('data-theme-pref', choice);
+  try {
+    localStorage.setItem(THEME_KEY, choice);
   } catch (_) {}
   const btn = $('btnTheme');
-  if (btn) btn.textContent = next === 'dark' ? '深色' : '浅色';
+  if (btn) btn.textContent = themeLabel(choice);
+  const sel = $('setThemePref');
+  if (sel && sel.value !== choice) sel.value = choice;
 }
 
 function toggleTheme() {
-  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  applyTheme(cur === 'dark' ? 'light' : 'dark');
+  const order = ['system', 'light', 'dark'];
+  const cur = getThemePref();
+  const idx = order.indexOf(cur);
+  applyTheme(order[(idx + 1) % order.length]);
+}
+
+function bindSystemThemeListener() {
+  if (!window.matchMedia) return;
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = () => {
+    if (getThemePref() === 'system') applyTheme('system');
+  };
+  if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onChange);
+  else if (typeof mq.addListener === 'function') mq.addListener(onChange);
+}
+
+/** Extract 4–8 digit OTP / verification codes from SMS body (Chinese + EN cues). */
+function extractOtpCodes(body) {
+  const s = String(body || '');
+  if (!s) return [];
+  const found = [];
+  const seen = new Set();
+  const push = (code) => {
+    const c = String(code || '');
+    if (!/^\d{4,8}$/.test(c)) return;
+    if (/^(19|20)\d{2}$/.test(c)) return; // years
+    if (seen.has(c)) return;
+    seen.add(c);
+    found.push(c);
+  };
+  const keywordRe =
+    /(?:验证码|校验码|动态码|动态密码|认证码|确认码|短信码|code|otp|password|pin)[^\d]{0,12}(\d{4,8})/gi;
+  let m;
+  while ((m = keywordRe.exec(s))) push(m[1]);
+  if (!found.length) {
+    const reverseRe = /(\d{4,8})[^\d]{0,6}(?:验证码|校验码|动态码|为您的验证码)/g;
+    while ((m = reverseRe.exec(s))) push(m[1]);
+  }
+  if (!found.length) {
+    // Avoid swallowing mainland mobile numbers
+    const cleaned = s.replace(/\+?86?1[3-9]\d{9}/g, ' ');
+    const loose = cleaned.match(/(?<!\d)\d{4,8}(?!\d)/g) || [];
+    for (const c of loose) {
+      if (c.length === 4 || c.length === 6) push(c);
+    }
+  }
+  return found.slice(0, 3);
+}
+
+async function copyText(text) {
+  const v = String(text || '');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(v);
+      return true;
+    }
+  } catch (_) {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = v;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function switchView(name) {
@@ -292,6 +388,7 @@ function paintOverview(s) {
     setTile('port', '—', 'muted');
     setTile('iccid', '—', 'muted');
     setTile('reg', '—', 'muted');
+    setTile('adapter', '—', 'muted');
     paintMsisdn(null);
     return;
   }
@@ -340,6 +437,16 @@ function paintOverview(s) {
     .filter(Boolean)
     .join(' / ');
   setTile('reg', reg || (connected ? '已连接' : '未注册'), connected ? 'ok' : 'muted');
+
+  if (s.adapterHint) {
+    setTile('adapter', s.adapterHint, connected ? 'info' : 'muted');
+  } else if (s.vidPid) {
+    setTile('adapter', `USB ${s.vidPid}`, connected ? 'info' : 'muted');
+  } else if (connected) {
+    setTile('adapter', '已连接', 'ok');
+  } else {
+    setTile('adapter', '未检测到', 'muted');
+  }
 
   paintMsisdn(s);
   paintCall(s);
@@ -497,7 +604,40 @@ function renderConversation(thread) {
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = m.body || '';
+    const bodyText = m.body || '';
+    bubble.appendChild(document.createTextNode(bodyText));
+    if (m.direction === 'in') {
+      const otps = extractOtpCodes(bodyText);
+      if (otps.length) {
+        const row = document.createElement('div');
+        row.className = 'otp-chip-row';
+        for (const code of otps) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'otp-chip';
+          chip.title = '点击复制验证码';
+          const lab = document.createElement('span');
+          lab.className = 'otp-chip-label';
+          lab.textContent = '验证码';
+          const val = document.createElement('span');
+          val.textContent = code;
+          chip.appendChild(lab);
+          chip.appendChild(val);
+          chip.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            const ok = await copyText(code);
+            chip.title = ok ? '已复制' : '复制失败';
+            const prev = val.textContent;
+            val.textContent = ok ? '已复制' : '失败';
+            setTimeout(() => {
+              val.textContent = prev;
+            }, 1200);
+          });
+          row.appendChild(chip);
+        }
+        bubble.appendChild(row);
+      }
+    }
 
     const meta = document.createElement('div');
     meta.className = 'bubble-meta';
@@ -754,7 +894,8 @@ async function saveSetting(key, value) {
 }
 
 async function init() {
-  applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  applyTheme(getThemePref());
+  bindSystemThemeListener();
 
   try {
     const info = await window.toolkit.getInfo();
@@ -770,6 +911,11 @@ async function init() {
   });
 
   $('btnTheme').onclick = () => toggleTheme();
+  const themeSel = $('setThemePref');
+  if (themeSel) {
+    themeSel.value = getThemePref();
+    themeSel.addEventListener('change', () => applyTheme(themeSel.value));
+  }
 
   if (window.toolkit.onSmsUrc) {
     window.toolkit.onSmsUrc((payload) => {
@@ -978,6 +1124,49 @@ async function init() {
       setBusy(false);
     }
   };
+
+  async function sendAtConsole(cmd) {
+    const input = $('atInput');
+    const out = $('atConsole');
+    const line = String(cmd != null ? cmd : (input && input.value) || '').trim();
+    if (!line) return;
+    if (input) input.value = line;
+    if (out) appendLog(out, `>>> ${line}`);
+    setBusy(true);
+    try {
+      const result = await window.toolkit.atRaw(line);
+      const raw = (result && (result.raw || result.error)) || '(无响应)';
+      if (out) appendLog(out, raw + (result && result.ok === false ? '' : ''));
+      if (result && result.status) {
+        lastStatus = result.status;
+        paintOverview(result.status);
+      }
+    } catch (e) {
+      if (out) appendLog(out, '错误: ' + (e.message || e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if ($('btnAtSend')) {
+    $('btnAtSend').onclick = () => sendAtConsole();
+  }
+  if ($('atInput')) {
+    $('atInput').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        sendAtConsole();
+      }
+    });
+  }
+  if ($('btnAtClear') && $('atConsole')) {
+    $('btnAtClear').onclick = () => {
+      $('atConsole').textContent = '';
+    };
+  }
+  document.querySelectorAll('#atPresets [data-at]').forEach((btn) => {
+    btn.addEventListener('click', () => sendAtConsole(btn.getAttribute('data-at')));
+  });
 
   $('btnSmsClearSm').onclick = async () => {
     const ok = window.confirm(

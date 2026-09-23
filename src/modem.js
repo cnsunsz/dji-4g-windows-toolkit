@@ -1,7 +1,7 @@
 'use strict';
 
 const { SerialPort } = require('serialport');
-const { AT_PORT_HINT, findAtPort, listSerialPorts } = require('./device');
+const { AT_PORT_HINT, findAtPort, listSerialPorts, normalizeVidPid } = require('./device');
 const {
   encodeSubmitPdu,
   parseCmglPdu,
@@ -56,6 +56,8 @@ class AtModem {
     this._port = null;
     this._serial = null;
     this._error = null;
+    this._vidPid = null;
+    this._adapterHint = null;
     this._signal = null;
     this._operator = null;
     this._ownNumber = null;
@@ -101,6 +103,8 @@ class AtModem {
     return {
       connected: !!(this._serial && this._serial.isOpen),
       port: this._port,
+      vidPid: this._vidPid,
+      adapterHint: this._adapterHint,
       signal: this._signal,
       operator: this._operator,
       ownNumber: this._ownNumber, // CNUM only; may be empty on CMCC
@@ -370,6 +374,15 @@ class AtModem {
       return this.status();
     }
     this._port = match.device;
+    this._vidPid = normalizeVidPid(match.vid, match.pid);
+    const desc = String(match.description || '');
+    if (/百旺|baiwang|wwan|ndis|qdc507|cellular/i.test(desc)) {
+      this._adapterHint = desc.slice(0, 80);
+    } else if (this._vidPid) {
+      this._adapterHint = `USB ${this._vidPid}`;
+    } else {
+      this._adapterHint = null;
+    }
     this._error = `正在初始化 ${this._port}`;
     try {
       this._serial = new SerialPort({
@@ -1038,6 +1051,33 @@ class AtModem {
     await this._command('AT+CMGD=1,4', { timeout: 30000 });
     await this._refreshLocked();
     return { ok: true, status: this.status(), messages: this.messages() };
+  }
+
+  /** Interactive AT console: return raw response; ERROR payloads returned as ok:false. */
+  atRaw(command, opts = {}) {
+    return this._enqueue(() => this._atRawLocked(command, opts));
+  }
+
+  async _atRawLocked(command, { timeout = 10000 } = {}) {
+    if (!this._serial || !this._serial.isOpen) {
+      throw new Error('设备未连接');
+    }
+    const cmd = String(command || '').trim();
+    if (!cmd) throw new Error('请输入 AT 命令');
+    const upper = cmd.toUpperCase();
+    if (upper.startsWith('AT+CMGS') || upper.startsWith('AT+CUSD') || upper.startsWith('ATD')) {
+      throw new Error('该命令请使用对应功能页，勿在调试台发送（避免交互/挂起）');
+    }
+    if (!/^AT/i.test(cmd) && cmd !== 'A/' && cmd !== 'a/') {
+      throw new Error('仅允许 AT 开头的命令');
+    }
+    try {
+      const raw = await this._command(cmd, { timeout });
+      return { ok: true, command: cmd, raw: String(raw || '').trim(), status: this.status() };
+    } catch (err) {
+      const raw = String(err.message || err);
+      return { ok: false, command: cmd, raw, error: raw, status: this.status() };
+    }
   }
 }
 

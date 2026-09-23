@@ -1,6 +1,6 @@
 # DJI 4G Windows Toolkit
 
-面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows **Electron** 桌面工具箱：一键安装 Quectel USB 驱动（AT/DM/filter），并在**同一窗口内**通过 Quectel USB AT Port 以 **PDU 模式**收发短信、查看本机号码 / IMS 等状态；v0.6 起提供**手机式短信会话**、**来电弹窗 / 系统通知**与**托盘后台**。
+面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows **Electron** 桌面工具箱：一键安装 Quectel USB 驱动（AT/DM/filter），并在**同一窗口内**通过 Quectel USB AT Port 以 **PDU 模式**收发短信、查看本机号码 / IMS 等状态；v0.6 起提供**手机式短信会话**、**来电弹窗 / 系统通知**与**托盘后台**；**v0.7** 起对齐更接近 macOS 连接工具的体验（透明图标、跟随系统主题、短信验证码芯片、AT 控制台）。
 
 仓库：<https://github.com/cnsunsz/dji-4g-windows-toolkit>
 
@@ -10,14 +10,15 @@
 
 ## 功能
 
-1. **Electron 桌面应用**：左侧导航（概览 / 短信 / 通话(实验) / 驱动 / 诊断 / **设置**）+ 浅色默认主题（可切换深色并持久化）
+1. **Electron 桌面应用**：左侧导航（概览 / 短信 / 通话(实验) / 驱动 / 诊断 / **设置**）+ **浅色 / 深色 / 跟随系统** 主题（持久化）· macOS Settings 风格侧栏
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS：默认一键安装 `qcser` / `qcmdm` / `qcfilter`；可选单独安装 **`qcwwan`** 作为上网（WWAN/NDIS）驱动（非大疆官方独立包，可能覆盖百旺/大疆已有 WWAN）
-3. **短信会话（PDU，v0.6）**：按对端号码聚合线程（规范化 `+86` / 首位 `0`）；左侧会话列表 + 右侧聊天气泡（收到靠左、发出靠右）；成功发送后把**出站短信**持久化到 `userData`（按 ICCID）；与模组 PDU 收件箱合并；未读角标（`+CMTI` / 轮询）；会话内删除 / 清空会话；仍支持清空 SM。**默认不自动删除**短信
+3. **短信会话（PDU，v0.6）**：按对端号码聚合线程（规范化 `+86` / 首位 `0`）；左侧会话列表 + 右侧聊天气泡（收到靠左灰、发出靠右蓝，接近 iMessage）；成功发送后把**出站短信**持久化到 `userData`（按 ICCID）；与模组 PDU 收件箱合并；未读角标（`+CMTI` / 轮询）；会话内删除 / 清空会话；仍支持清空 SM。**默认不自动删除**短信。**v0.7**：自动识别短信中的 4–8 位验证码，气泡内显示可一键复制的芯片
 4. **本机号码（v0.5）**：`AT+CNUM` 若有则优先显示；否则按 **ICCID** 持久化用户填写的 MSISDN（`userData/msisdn-by-iccid.json`）。概览与短信页顶栏显示有效号码；支持 **USSD 查号** 与从近期短信扫描大陆手机号。**不宣称 CNUM 在空返回时可用**
 5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.6**：来电时应用内弹层（接听 / 挂断 / 忽略）+ 可选 Windows Toast；托盘菜单亦可接听/挂断
 6. **托盘与后台（v0.6）**：系统托盘；默认关闭窗口时最小化到托盘（模组保持连接）；托盘菜单：显示主窗口 / 接听 / 挂断 / 退出
 7. **设置页（v0.6）**：开机启动、关闭到托盘、来电系统通知、来电弹窗、启动自动连接模组、托盘闪烁提示（均持久化到 `userData/settings.json`）
-8. **概览状态板** + **启用 IMS**（可选软重启）
+8. **概览状态板**（含 USB/适配器提示）+ **启用 IMS**（可选软重启）
+9. **诊断 · AT 控制台（v0.7）**：网页式单行 AT 调试（预设 CSQ/COPS/IMS/QCCID 等）；eSIM 仅占位「即将支持」
 
 ### 短信会话 / 托盘怎么用
 
@@ -55,8 +56,8 @@
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.6.0
-   git push origin v0.6.0
+   git tag v0.7.0
+   git push origin v0.7.0
    ```
 2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版，并创建 GitHub Release
 3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行
@@ -132,7 +133,8 @@ src/pdu.js               MIT 自研 SMS PDU 编解码
 src/driver.js            捆绑驱动路径 + 提权安装
 scripts/Install-Drivers.ps1
 drivers/windows10/
-build/icon.png           托盘 / 窗口图标
+build/icon.png + icon.ico 透明圆角方形应用图标（无白边）
+scripts/generate-icon.py 图标生成（Pillow）
 ```
 
 ---
@@ -145,6 +147,7 @@ build/icon.png           托盘 / 窗口图标
 - **v0.3–v0.5** PDU / 状态 / IMS / 本机号码 / 实验语音：受 macOS 侧同类工具常见 AT 用法启发；实现为对照 **3GPP / Quectel 公开 AT** 的清洁重写，**未复制** PolyForm 源码
 - **v0.4 UI**：侧栏控制台视觉受 VoHive / DJOneHub 启发；HTML/CSS/JS 为**原创 MIT**
 - **v0.6**：手机式会话气泡 / 来电弹窗 / 托盘通知为原创 MIT 实现（手机/桌面通话 UX 灵感，无第三方源码复制）
+- **v0.7**：更接近 macOS 设置/信息的 UI、验证码芯片、跟随系统主题、AT 控制台、透明图标 — 功能灵感来自同类 Mac 连接工具，**HTML/CSS/JS/图标均为原创 MIT**，未复制 PolyForm 源码
 
 所用技术（`CMGF=0`、`CMGL=4`、`CNMI`、`QCFG="ims"`、CNUM/CCID、`ATD`/`ATA`/`ATH`、`CUSD` 等）均为公开调制解调器 AT 实践。
 
@@ -159,7 +162,8 @@ build/icon.png           托盘 / 窗口图标
 - Overview tiles + MSISDN helper (CNUM / ICCID-saved / USSD / SMS scan)
 - Experimental voice: AT dial/answer/hangup; **incoming call popup + Windows toast + tray** (v0.6)
 - Settings: launch at login, close-to-tray, notify/popup, auto-connect
-- IMS enable; light/dark theme
+- IMS enable; light / dark / **follow system** theme
+- v0.7: OTP chips, AT console, transparent Mac-style app icon
 
 **Release:** push `v*` tag → Actions builds on `windows-latest` → Release assets.
 

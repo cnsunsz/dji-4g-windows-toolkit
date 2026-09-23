@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('toolkit', {
   callEnableUsbAudio: (reboot) => ipcRenderer.invoke('call:enableUsbAudio', { reboot: !!reboot }),
   callRestoreUsbcfg: (reboot) => ipcRenderer.invoke('call:restoreUsbcfg', { reboot: !!reboot }),
   callTryQpcmv: () => ipcRenderer.invoke('call:tryQpcmv'),
+  atRaw: (command, timeout) => ipcRenderer.invoke('at:raw', { command, timeout }),
   onSmsUrc: (handler) => {
     const listener = (_evt, payload) => handler(payload);
     ipcRenderer.on('sms:urc', listener);

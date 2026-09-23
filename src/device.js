@@ -226,6 +226,8 @@ module.exports = {
   DJI_PID,
   QUECTEL_VID,
   QUECTEL_PID,
+  normalizeVidPid,
+  isSupportedVidPid,
   listSerialPorts,
   findAtPort,
   detectStatus,

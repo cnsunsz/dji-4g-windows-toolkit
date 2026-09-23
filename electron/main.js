@@ -764,3 +764,18 @@ ipcMain.handle('call:tryQpcmv', async () => {
     };
   }
 });
+
+ipcMain.handle('at:raw', async (_evt, payload) => {
+  try {
+    const result = await modem.atRaw(payload?.command, { timeout: payload?.timeout });
+    return { ...result, status: enrichStatus(result.status || modem.status()) };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      raw: String(err.message || err),
+      status: enrichStatus(modem.status()),
+    };
+  }
+});
+
