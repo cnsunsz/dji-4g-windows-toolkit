@@ -1,7 +1,7 @@
 {
   "name": "dji-4g-windows-toolkit",
-  "version": "0.5.0",
-  "description": "DJI 4G Windows Toolkit — Electron app for Quectel driver install, PDU SMS, MSISDN helper, and experimental voice AT control",
+  "version": "0.6.0",
+  "description": "DJI 4G Windows Toolkit — Electron app: Quectel drivers, PDU SMS chat threads, MSISDN helper, experimental voice with tray/notifications",
   "main": "electron/main.js",
   "author": "cnsunsz",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "start": "electron .",
     "build": "electron-builder --win --publish never",
     "pack": "electron-builder --dir --win",
-    "check:pdu": "node scripts/check-pdu.js"
+    "check:pdu": "node scripts/check-pdu.js",
+    "check:threads": "node scripts/check-threads.js"
   },
   "dependencies": {
     "serialport": "^12.0.0"
@@ -34,7 +35,8 @@
     "files": [
       "electron/**/*",
       "src/**/*",
-      "package.json"
+      "package.json",
+      "build/icon.png"
     ],
     "extraResources": [
       {
@@ -72,6 +74,7 @@
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
-    "publish": null
+    "publish": null,
+    "icon": "build/icon.png"
   }
 }

@@ -5,10 +5,11 @@ const $ = (id) => document.getElementById(id);
 const THEME_KEY = 'dji4g-toolkit-theme';
 const VIEW_META = {
   overview: { title: '模块概览', sub: '运营商 / 信号 / SIM / IMS / 本机号码' },
-  sms: { title: '短信', sub: 'PDU 收发 · SM / ME / MT · +CMTI 监听' },
+  sms: { title: '短信', sub: '会话线程 · PDU 收发 · 本地已发送持久化' },
   call: { title: '通话', sub: '实验功能 · AT 语音控制 · 音频路径视固件而定' },
   drivers: { title: '驱动', sub: 'Quectel qcser / qcmdm / qcfilter · 可选 qcwwan · 需 UAC' },
   diag: { title: '诊断', sub: 'USB / AT 口 / ATI · IMS 启用' },
+  settings: { title: '设置', sub: '开机启动 · 托盘 · 来电通知 / 弹窗 · 自动连接' },
 };
 
 const CALL_STATE_LABEL = {
@@ -22,12 +23,14 @@ const CALL_STATE_LABEL = {
 let refreshTimer = null;
 let busy = false;
 let lastStatus = null;
-/** @type {Set<string>} */
-let selectedSmsKeys = new Set();
 let lastMessages = [];
-/** Track ICCID so UI clears number field when SIM changes */
+let lastThreads = [];
+let activePeer = null;
+let threadSearch = '';
 let uiIccid = null;
 let lastDetectedNumbers = [];
+let settingsCache = null;
+let popupIgnored = false;
 
 function setBusy(isBusy) {
   busy = isBusy;
@@ -38,10 +41,9 @@ function setBusy(isBusy) {
     'btnSmsRefresh',
     'btnSmsReconnect',
     'btnSend',
-    'btnSmsSelectAll',
-    'btnSmsSelectNone',
-    'btnSmsDeleteSelected',
     'btnSmsClearSm',
+    'btnClearThread',
+    'btnNewThread',
     'btnEnableIms',
     'btnEnableImsReboot',
     'btnMsisdnSave',
@@ -53,6 +55,8 @@ function setBusy(isBusy) {
     'btnEnableUsbAudio',
     'btnRestoreUsbcfg',
     'btnTryQpcmv',
+    'btnPopupAnswer',
+    'btnPopupHangup',
   ]) {
     const el = $(id);
     if (el) el.disabled = isBusy;
@@ -136,6 +140,35 @@ function sourceLabel(s) {
   return '未设置';
 }
 
+function displayPeerLocal(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '(未知)';
+  const m = s.match(/^\+?86(1[3-9]\d{9})$/);
+  if (m) return m[1];
+  if (/^1[3-9]\d{9}$/.test(s)) return s;
+  return s;
+}
+
+function formatTimeShort(ts, timestamp) {
+  let t = ts;
+  if (!t && timestamp) {
+    const parsed = Date.parse(timestamp);
+    if (!Number.isNaN(parsed)) t = parsed;
+  }
+  if (!t) return '';
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return String(timestamp || '');
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (sameDay) return `${hh}:${mm}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
+}
+
 function paintMsisdn(s) {
   const eff = (s && s.effectiveMsisdn) || null;
   const src = (s && s.effectiveMsisdnSource) || 'none';
@@ -174,7 +207,6 @@ function paintMsisdn(s) {
     uiIccid = iccid;
     const input = $('msisdnInput');
     if (input) {
-      // Clear until user saves again for this ICCID; prefill saved if any.
       input.value = (s && s.savedMsisdn) || '';
     }
   } else if (s && s.savedMsisdn && $('msisdnInput') && !$('msisdnInput').value) {
@@ -240,6 +272,14 @@ function paintCall(s) {
       log.scrollTop = log.scrollHeight;
     }
   }
+
+  // Hide popup when call leaves ringing
+  if (state !== 'ringing') {
+    hideCallPopup();
+    popupIgnored = false;
+  } else if (!popupIgnored && settingsCache && settingsCache.popupOnCall) {
+    showCallPopup(s.callClip || s.callNumber || '—');
+  }
 }
 
 function paintOverview(s) {
@@ -279,7 +319,6 @@ function paintOverview(s) {
   else if (s.creg) netParts.push(`CREG ${s.creg}`);
   setTile('network', netParts.join(' · ') || '—', connected ? 'info' : 'muted');
 
-  // Never claim CNUM works when empty — show effective number with source.
   const eff = s.effectiveMsisdn;
   if (eff) {
     const tag = s.effectiveMsisdnSource === 'cnum' ? 'CNUM' : '已保存';
@@ -335,8 +374,175 @@ function setSmsStatus(s, ok) {
   }
 }
 
-function msgKey(m) {
-  return `${m.storage || 'SM'}:${m.index}`;
+function updateSmsNavBadge(threads) {
+  const btn = document.querySelector('.rail-item[data-view="sms"] .rail-label');
+  if (!btn) return;
+  const total = (threads || []).reduce((n, t) => n + (t.unread || 0), 0);
+  let label = btn.childNodes[0] && btn.childNodes[0].nodeType === 3 ? btn.childNodes[0] : null;
+  // Keep text "短信" and optional badge span
+  const base = '短信';
+  btn.textContent = '';
+  btn.appendChild(document.createTextNode(base));
+  if (total > 0) {
+    const dot = document.createElement('span');
+    dot.className = 'unread-dot';
+    dot.title = `${total} 条未读`;
+    btn.appendChild(dot);
+  }
+}
+
+function renderThreads(threads) {
+  lastThreads = Array.isArray(threads) ? threads.slice() : [];
+  updateSmsNavBadge(lastThreads);
+
+  const box = $('threadList');
+  if (!box) return;
+
+  const q = String(threadSearch || '')
+    .trim()
+    .toLowerCase();
+  const filtered = !q
+    ? lastThreads
+    : lastThreads.filter((t) => {
+        const peer = displayPeerLocal(t.peer).toLowerCase();
+        const preview = String(t.lastPreview || '').toLowerCase();
+        const raw = String(t.peer || '').toLowerCase();
+        return peer.includes(q) || preview.includes(q) || raw.includes(q);
+      });
+
+  if (!filtered.length) {
+    box.innerHTML =
+      '<div class="inbox-empty" style="padding:28px 12px">暂无会话<br><span style="font-size:12px;opacity:.85">收到或发送短信后将按号码聚合</span></div>';
+  } else {
+    box.textContent = '';
+    for (const t of filtered) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'thread-item' + (t.peer === activePeer ? ' is-active' : '');
+      const peerEl = document.createElement('div');
+      peerEl.className = 'thread-item-peer';
+      peerEl.textContent = displayPeerLocal(t.peer);
+      const meta = document.createElement('div');
+      meta.className = 'thread-item-meta';
+      if (t.unread > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'thread-badge';
+        badge.textContent = t.unread > 99 ? '99+' : String(t.unread);
+        meta.appendChild(badge);
+      } else {
+        meta.textContent = formatTimeShort(t.lastAt);
+      }
+      const preview = document.createElement('div');
+      preview.className = 'thread-item-preview';
+      preview.textContent = t.lastPreview || '（无内容）';
+      btn.appendChild(peerEl);
+      btn.appendChild(meta);
+      btn.appendChild(preview);
+      btn.addEventListener('click', () => selectThread(t.peer));
+      box.appendChild(btn);
+    }
+  }
+
+  if (activePeer) {
+    const still = lastThreads.find((t) => t.peer === activePeer);
+    if (still) renderConversation(still);
+    else {
+      // Keep compose target but empty bubbles if thread cleared
+      renderConversation({ peer: activePeer, messages: [], unread: 0 });
+    }
+  } else {
+    renderConversation(null);
+  }
+}
+
+function renderConversation(thread) {
+  const title = $('threadPeerTitle');
+  const sub = $('threadPeerSub');
+  const clearBtn = $('btnClearThread');
+  const bubbles = $('chatBubbles');
+  if (!bubbles) return;
+
+  if (!thread) {
+    if (title) title.textContent = '选择会话';
+    if (sub) sub.textContent = '左侧选择号码查看对话，或点「新建」';
+    if (clearBtn) clearBtn.hidden = true;
+    bubbles.innerHTML = '<div class="chat-empty">选择左侧会话，或发送一条新短信开始对话</div>';
+    return;
+  }
+
+  if (title) title.textContent = displayPeerLocal(thread.peer);
+  if (sub) {
+    sub.textContent =
+      thread.peer && thread.peer !== displayPeerLocal(thread.peer)
+        ? thread.peer
+        : `${(thread.messages || []).length} 条消息`;
+  }
+  if (clearBtn) clearBtn.hidden = false;
+
+  const to = $('smsTo');
+  if (to && document.activeElement !== to) {
+    to.value = displayPeerLocal(thread.peer);
+  }
+
+  const msgs = thread.messages || [];
+  if (!msgs.length) {
+    bubbles.innerHTML = '<div class="chat-empty">会话为空。在下方输入内容发送。</div>';
+    return;
+  }
+
+  bubbles.textContent = '';
+  for (const m of msgs) {
+    const row = document.createElement('div');
+    row.className = 'bubble-row ' + (m.direction === 'out' ? 'is-out' : 'is-in');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = m.body || '';
+
+    const meta = document.createElement('div');
+    meta.className = 'bubble-meta';
+    const time = document.createElement('span');
+    time.textContent =
+      formatTimeShort(m.ts, m.timestamp) ||
+      (m.direction === 'out' ? '已发送' : '收到');
+    meta.appendChild(time);
+
+    if (m.direction === 'in' && m.index != null && m.index !== '') {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'bubble-del';
+      del.textContent = '删除';
+      del.title = `从模组删除 #${m.index} (${m.storage || 'SM'})`;
+      del.addEventListener('click', () => deleteInboundMessage(m));
+      meta.appendChild(del);
+    } else if (m.direction === 'out' && m.local && m.id) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'bubble-del';
+      del.textContent = '删除本地';
+      del.addEventListener('click', () => deleteOutboundMessage(m));
+      meta.appendChild(del);
+    }
+
+    row.appendChild(bubble);
+    row.appendChild(meta);
+    bubbles.appendChild(row);
+  }
+  bubbles.scrollTop = bubbles.scrollHeight;
+}
+
+async function selectThread(peer) {
+  activePeer = peer;
+  renderThreads(lastThreads);
+  try {
+    const data = await window.toolkit.smsMarkRead(peer, uiIccid || undefined);
+    if (data && data.threads) {
+      lastThreads = data.threads;
+      renderThreads(lastThreads);
+    }
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 function renderDetectedChips(boxId, listId, numbers, { preferOwn = true } = {}) {
@@ -362,94 +568,6 @@ function renderDetectedChips(boxId, listId, numbers, { preferOwn = true } = {}) 
     btn.addEventListener('click', () => saveMsisdnNumber(n.e164 || n.number));
     list.appendChild(btn);
   }
-}
-
-function renderMessages(msgs) {
-  const box = $('smsList');
-  lastMessages = Array.isArray(msgs) ? msgs.slice() : [];
-  const alive = new Set(lastMessages.filter((m) => m.index != null && m.index !== '').map(msgKey));
-  for (const k of [...selectedSmsKeys]) {
-    if (!alive.has(k)) selectedSmsKeys.delete(k);
-  }
-
-  if (!lastMessages.length) {
-    box.innerHTML =
-      '<div class="inbox-empty">暂无短信<br><span style="font-size:12px;opacity:.85">PDU 列表为空时多为网络 / IMS / SIM 侧未投递</span></div>';
-    return;
-  }
-
-  box.textContent = '';
-  for (const m of lastMessages) {
-    const concat =
-      m.concat && m.concat.reassembled
-        ? ` · 长短信 ${m.concat.seq || ''}/${m.concat.total}`
-        : m.concat
-          ? ` · 分段 ${m.concat.seq}/${m.concat.total}`
-          : '';
-
-    const key = msgKey(m);
-    const canSelect = m.index != null && m.index !== '';
-
-    const row = document.createElement('article');
-    row.className = 'msg';
-
-    const checkWrap = document.createElement('label');
-    checkWrap.className = 'msg-check';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.disabled = !canSelect;
-    cb.checked = canSelect && selectedSmsKeys.has(key);
-    cb.addEventListener('change', () => {
-      if (cb.checked) selectedSmsKeys.add(key);
-      else selectedSmsKeys.delete(key);
-    });
-    checkWrap.appendChild(cb);
-
-    const side = document.createElement('div');
-    side.className = 'msg-side';
-
-    const sender = document.createElement('div');
-    sender.className = 'msg-sender';
-    sender.textContent = m.sender || '(未知发件人)';
-
-    const meta = document.createElement('div');
-    meta.className = 'msg-meta';
-    meta.textContent = `${m.timestamp || '时间未知'} · #${m.index ?? '?'} · ${m.storage || '?'}${concat}`;
-
-    side.appendChild(sender);
-    side.appendChild(meta);
-
-    const body = document.createElement('div');
-    body.className = 'msg-body';
-    body.textContent = m.body || '';
-
-    const actions = document.createElement('div');
-    actions.className = 'msg-actions';
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'btn tiny danger-ghost';
-    delBtn.textContent = '删除';
-    delBtn.title = '从模组存储删除此条';
-    delBtn.disabled = !canSelect;
-    delBtn.addEventListener('click', () => deleteOneMessage(m));
-    actions.appendChild(delBtn);
-
-    row.appendChild(checkWrap);
-    row.appendChild(side);
-    row.appendChild(body);
-    row.appendChild(actions);
-    box.appendChild(row);
-  }
-}
-
-function selectedItems() {
-  const map = new Map(lastMessages.filter((m) => m.index != null && m.index !== '').map((m) => [msgKey(m), m]));
-  const items = [];
-  for (const k of selectedSmsKeys) {
-    const m = map.get(k);
-    if (m) items.push({ storage: m.storage || 'SM', index: m.index });
-  }
-  return items;
 }
 
 async function saveMsisdnNumber(number) {
@@ -479,10 +597,10 @@ async function saveMsisdnNumber(number) {
   }
 }
 
-async function deleteOneMessage(m) {
+async function deleteInboundMessage(m) {
   if (!m || m.index == null || m.index === '') return;
   const ok = window.confirm(
-    `确定删除此短信？\n发件人: ${m.sender || '?'}\n索引: #${m.index} · 存储: ${m.storage || 'SM'}\n\n不会自动删除；仅在确认后执行 AT+CMGD。`
+    `确定删除此短信？\n对端: ${displayPeerLocal(m.peer)}\n索引: #${m.index} · 存储: ${m.storage || 'SM'}\n\n仅在确认后执行 AT+CMGD。`
   );
   if (!ok) return;
   setBusy(true);
@@ -490,9 +608,9 @@ async function deleteOneMessage(m) {
   try {
     const result = await window.toolkit.smsDelete(m.storage || 'SM', m.index);
     if (!result.ok) throw new Error(result.error || '删除失败');
-    selectedSmsKeys.delete(msgKey(m));
     setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
-    renderMessages(result.messages || []);
+    if (result.threads) renderThreads(result.threads);
+    else await refreshSms();
   } catch (e) {
     setSmsStatus('删除失败: ' + (e.message || e), false);
   } finally {
@@ -500,27 +618,40 @@ async function deleteOneMessage(m) {
   }
 }
 
-async function deleteSelectedMessages() {
-  const items = selectedItems();
-  if (!items.length) {
-    setSmsStatus('请先勾选要删除的短信', false);
-    switchView('sms');
-    return;
+async function deleteOutboundMessage(m) {
+  if (!m || !m.id) return;
+  const ok = window.confirm('删除本地已发送记录？（不影响对端已收到的短信）');
+  if (!ok) return;
+  setBusy(true);
+  try {
+    const result = await window.toolkit.smsDeleteOutbound(m.id, uiIccid || undefined);
+    if (!result.ok) throw new Error(result.error || '删除失败');
+    if (result.threads) renderThreads(result.threads);
+  } catch (e) {
+    setSmsStatus('删除本地记录失败: ' + (e.message || e), false);
+  } finally {
+    setBusy(false);
   }
+}
+
+async function clearActiveThread() {
+  if (!activePeer) return;
   const ok = window.confirm(
-    `确定删除所选 ${items.length} 条短信？\n将对每条执行 AT+CMGD（按存储切换 CPMS）。\n此操作不可恢复。`
+    `清空与 ${displayPeerLocal(activePeer)} 的会话？\n将删除模组内该号码的收件短信，并清除本地已发送记录。`
   );
   if (!ok) return;
   setBusy(true);
-  setSmsStatus(`正在删除所选 ${items.length} 条…`);
+  setSmsStatus('正在清空会话…');
   try {
-    const result = await window.toolkit.smsDeleteMany(items);
-    if (!result.ok) throw new Error(result.error || '批量删除失败');
-    selectedSmsKeys.clear();
-    setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
-    renderMessages(result.messages || []);
+    const result = await window.toolkit.smsClearThread(activePeer, uiIccid || undefined);
+    if (!result.ok) throw new Error(result.error || '清空失败');
+    if (result.status) {
+      setSmsStatus(result.status, !!(result.status.connected && !result.status.error));
+    }
+    if (result.threads) renderThreads(result.threads);
+    else await refreshSms();
   } catch (e) {
-    setSmsStatus('批量删除失败: ' + (e.message || e), false);
+    setSmsStatus('清空会话失败: ' + (e.message || e), false);
   } finally {
     setBusy(false);
   }
@@ -531,7 +662,12 @@ async function refreshSms() {
     const data = await window.toolkit.smsRefresh();
     const s = data.status || {};
     setSmsStatus(s, !!(s.connected && !s.error));
-    renderMessages(data.messages || []);
+    lastMessages = data.messages || [];
+    if (data.threads) renderThreads(data.threads);
+    else {
+      const t = await window.toolkit.smsThreads();
+      if (t.threads) renderThreads(t.threads);
+    }
     lastDetectedNumbers = data.detectedNumbers || [];
     renderDetectedChips('smsDetectBox', 'smsDetectList', lastDetectedNumbers);
     ensureAutoRefresh(!!s.connected);
@@ -559,6 +695,64 @@ function currentUssdCode() {
   return String(preset || '').trim();
 }
 
+function showCallPopup(number) {
+  const el = $('callPopup');
+  if (!el) return;
+  $('callPopupNumber').textContent = displayPeerLocal(number) || '未知号码';
+  $('callPopupSub').textContent = '振铃中…';
+  el.hidden = false;
+}
+
+function hideCallPopup() {
+  const el = $('callPopup');
+  if (el) el.hidden = true;
+}
+
+function paintSettings(s) {
+  settingsCache = s || settingsCache;
+  if (!settingsCache) return;
+  const map = {
+    setOpenAtLogin: 'openAtLogin',
+    setCloseToTray: 'closeToTray',
+    setNotifyOnCall: 'notifyOnCall',
+    setPopupOnCall: 'popupOnCall',
+    setAutoConnect: 'autoConnect',
+    setFlashTrayOnRing: 'flashTrayOnRing',
+  };
+  for (const [id, key] of Object.entries(map)) {
+    const el = $(id);
+    if (el) el.checked = !!settingsCache[key];
+  }
+}
+
+async function loadSettings() {
+  try {
+    const s = await window.toolkit.getSettings();
+    paintSettings(s);
+  } catch (_) {
+    paintSettings({
+      openAtLogin: false,
+      closeToTray: true,
+      notifyOnCall: true,
+      popupOnCall: true,
+      autoConnect: true,
+      flashTrayOnRing: true,
+    });
+  }
+}
+
+async function saveSetting(key, value) {
+  try {
+    const result = await window.toolkit.setSettings({ [key]: !!value });
+    if (result && result.settings) paintSettings(result.settings);
+    const note = $('settingsSaveNote');
+    if (note) note.textContent = '已保存并立即生效。';
+  } catch (e) {
+    const note = $('settingsSaveNote');
+    if (note) note.textContent = '保存失败: ' + (e.message || e);
+  }
+}
+
 async function init() {
   applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
 
@@ -569,6 +763,8 @@ async function init() {
     $('ver').textContent = '';
   }
 
+  await loadSettings();
+
   document.querySelectorAll('.rail-item').forEach((btn) => {
     btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
   });
@@ -578,22 +774,65 @@ async function init() {
   if (window.toolkit.onSmsUrc) {
     window.toolkit.onSmsUrc((payload) => {
       if (payload && payload.type === 'CALL') {
-        paintCall({ ...(lastStatus || {}), callState: payload.state, callNumber: payload.number, callClip: payload.clip });
+        paintCall({
+          ...(lastStatus || {}),
+          callState: payload.state,
+          callNumber: payload.number,
+          callClip: payload.clip,
+        });
+        return;
+      }
+      if (payload && payload.type === 'AUTO_CONNECT') {
+        if (!busy) refreshSms();
         return;
       }
       if (!busy) refreshSms();
     });
   }
   if (window.toolkit.onCallUrc) {
-    window.toolkit.onCallUrc(async () => {
+    window.toolkit.onCallUrc(async (payload) => {
       try {
         const data = await window.toolkit.callStatus();
         if (data.status) {
           lastStatus = data.status;
           paintCall(data.status);
+        } else if (payload) {
+          paintCall({
+            ...(lastStatus || {}),
+            callState: payload.state,
+            callNumber: payload.number,
+            callClip: payload.clip,
+          });
         }
       } catch (_) {}
     });
+  }
+  if (window.toolkit.onIncomingCallPopup) {
+    window.toolkit.onIncomingCallPopup((payload) => {
+      if (settingsCache && settingsCache.popupOnCall === false) return;
+      if (popupIgnored) return;
+      showCallPopup((payload && (payload.display || payload.number)) || '—');
+    });
+  }
+  if (window.toolkit.onNewInboundSms) {
+    window.toolkit.onNewInboundSms(() => {
+      if (!busy) refreshSms();
+    });
+  }
+
+  // Settings checkboxes
+  const settingBind = [
+    ['setOpenAtLogin', 'openAtLogin'],
+    ['setCloseToTray', 'closeToTray'],
+    ['setNotifyOnCall', 'notifyOnCall'],
+    ['setPopupOnCall', 'popupOnCall'],
+    ['setAutoConnect', 'autoConnect'],
+    ['setFlashTrayOnRing', 'flashTrayOnRing'],
+  ];
+  for (const [id, key] of settingBind) {
+    const el = $(id);
+    if (!el) continue;
+    el.addEventListener('change', () => saveSetting(key, el.checked));
   }
 
   $('ussdPreset').onchange = () => {
@@ -710,7 +949,6 @@ async function init() {
       const result = await window.toolkit.smsEnableIms(false);
       if (!result.ok) throw new Error(result.error || '启用失败');
       setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
-      renderMessages(result.messages || []);
       await refreshSms();
     } catch (e) {
       setSmsStatus('启用 IMS 失败: ' + (e.message || e), false);
@@ -741,21 +979,6 @@ async function init() {
     }
   };
 
-  $('btnSmsSelectAll').onclick = () => {
-    for (const m of lastMessages) {
-      if (m.index == null || m.index === '') continue;
-      selectedSmsKeys.add(msgKey(m));
-    }
-    renderMessages(lastMessages);
-  };
-
-  $('btnSmsSelectNone').onclick = () => {
-    selectedSmsKeys.clear();
-    renderMessages(lastMessages);
-  };
-
-  $('btnSmsDeleteSelected').onclick = () => deleteSelectedMessages();
-
   $('btnSmsClearSm').onclick = async () => {
     const ok = window.confirm(
       '将清空当前存储 SM 中的全部短信（AT+CMGD=1,4）。\n此操作不可恢复。是否继续？'
@@ -767,13 +990,38 @@ async function init() {
       const result = await window.toolkit.smsDeleteAll('SM');
       if (!result.ok) throw new Error(result.error || '清空失败');
       setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
-      renderMessages(result.messages || []);
+      if (result.threads) renderThreads(result.threads);
+      else await refreshSms();
     } catch (e) {
       setSmsStatus('清空失败: ' + (e.message || e), false);
     } finally {
       setBusy(false);
     }
   };
+
+  if ($('btnClearThread')) {
+    $('btnClearThread').onclick = () => clearActiveThread();
+  }
+
+  if ($('btnNewThread')) {
+    $('btnNewThread').onclick = () => {
+      activePeer = null;
+      renderThreads(lastThreads);
+      const to = $('smsTo');
+      if (to) {
+        to.value = '';
+        to.focus();
+      }
+      switchView('sms');
+    };
+  }
+
+  if ($('threadSearch')) {
+    $('threadSearch').addEventListener('input', () => {
+      threadSearch = $('threadSearch').value || '';
+      renderThreads(lastThreads);
+    });
+  }
 
   $('btnSend').onclick = async () => {
     const to = $('smsTo').value.trim();
@@ -789,7 +1037,22 @@ async function init() {
       const result = await window.toolkit.smsSend(to, text);
       if (!result.ok) throw new Error(result.error || '发送失败');
       $('smsText').value = '';
+      // Prefer selecting the peer we just sent to
+      if (result.threads) {
+        lastThreads = result.threads;
+        // Find matching peer
+        const hit = result.threads.find(
+          (t) =>
+            displayPeerLocal(t.peer) === displayPeerLocal(to) ||
+            String(t.peer).includes(to.replace(/\D/g, '').slice(-11))
+        );
+        if (hit) activePeer = hit.peer;
+        renderThreads(result.threads);
+      }
       await refreshSms();
+      if (result.status) {
+        setSmsStatus(result.status, !!(result.status.connected && !result.status.error));
+      }
     } catch (e) {
       setSmsStatus('发送失败: ' + (e.message || e), false);
     } finally {
@@ -804,7 +1067,53 @@ async function init() {
     }
   });
 
-  // —— Call ——
+  // —— Call popup ——
+  if ($('btnPopupAnswer')) {
+    $('btnPopupAnswer').onclick = async () => {
+      hideCallPopup();
+      popupIgnored = false;
+      setBusy(true);
+      try {
+        const result = await window.toolkit.callAnswer();
+        if (!result.ok) throw new Error(result.error || '接听失败');
+        if (result.status) {
+          lastStatus = result.status;
+          paintCall(result.status);
+        }
+      } catch (e) {
+        setSmsStatus('接听失败: ' + (e.message || e), false);
+      } finally {
+        setBusy(false);
+      }
+    };
+  }
+  if ($('btnPopupHangup')) {
+    $('btnPopupHangup').onclick = async () => {
+      hideCallPopup();
+      popupIgnored = false;
+      setBusy(true);
+      try {
+        const result = await window.toolkit.callHangup();
+        if (!result.ok) throw new Error(result.error || '挂断失败');
+        if (result.status) {
+          lastStatus = result.status;
+          paintCall(result.status);
+        }
+      } catch (e) {
+        setSmsStatus('挂断失败: ' + (e.message || e), false);
+      } finally {
+        setBusy(false);
+      }
+    };
+  }
+  if ($('btnPopupIgnore')) {
+    $('btnPopupIgnore').onclick = () => {
+      popupIgnored = true;
+      hideCallPopup();
+    };
+  }
+
+  // —— Call page ——
   $('dialPad').addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-digit]');
     if (!btn) return;
@@ -847,6 +1156,7 @@ async function init() {
         lastStatus = result.status;
         paintCall(result.status);
       }
+      hideCallPopup();
     } catch (e) {
       setSmsStatus('接听失败: ' + (e.message || e), false);
     } finally {
@@ -863,6 +1173,7 @@ async function init() {
         lastStatus = result.status;
         paintCall(result.status);
       }
+      hideCallPopup();
     } catch (e) {
       setSmsStatus('挂断失败: ' + (e.message || e), false);
     } finally {
@@ -948,6 +1259,7 @@ async function init() {
 
   setBusy(true);
   try {
+    // If autoConnect already ran in main, reconnect is still fine / refreshes
     await window.toolkit.smsReconnect();
     await refreshSms();
   } catch (e) {
@@ -957,4 +1269,4 @@ async function init() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+init();

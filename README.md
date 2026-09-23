@@ -1,6 +1,6 @@
 # DJI 4G Windows Toolkit
 
-面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows **Electron** 桌面工具箱：一键安装 Quectel USB 驱动（AT/DM/filter），并在**同一窗口内**通过 Quectel USB AT Port 以 **PDU 模式**收发短信、查看本机号码 / IMS 等状态。
+面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows **Electron** 桌面工具箱：一键安装 Quectel USB 驱动（AT/DM/filter），并在**同一窗口内**通过 Quectel USB AT Port 以 **PDU 模式**收发短信、查看本机号码 / IMS 等状态；v0.6 起提供**手机式短信会话**、**来电弹窗 / 系统通知**与**托盘后台**。
 
 仓库：<https://github.com/cnsunsz/dji-4g-windows-toolkit>
 
@@ -10,31 +10,42 @@
 
 ## 功能
 
-1. **Electron 桌面应用**：左侧导航（概览 / 短信 / **通话(实验)** / 驱动 / 诊断）+ 浅色默认主题（可切换深色并持久化）
+1. **Electron 桌面应用**：左侧导航（概览 / 短信 / 通话(实验) / 驱动 / 诊断 / **设置**）+ 浅色默认主题（可切换深色并持久化）
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS：默认一键安装 `qcser` / `qcmdm` / `qcfilter`；可选单独安装 **`qcwwan`** 作为上网（WWAN/NDIS）驱动（非大疆官方独立包，可能覆盖百旺/大疆已有 WWAN）
-3. **短信（PDU）**：`AT+CMGF=0` + `AT+CNMI=2,1,0,0,0`；`AT+CMGL=4` 遍历 SM/ME/MT；自研 MIT 清洁实现的 SMS-DELIVER PDU 解码（发件人 / 时间戳 / GSM7·UCS2，基础长短信拼接）；PDU `CMGS` 发送（含 MR）；CMS 失败时可回退文本模式；监听 `+CMTI:` 刷新对应索引；支持单条 / 多选删除与确认后清空 SM。**默认不自动删除**短信
-4. **本机号码（v0.5）**：`AT+CNUM` 若有则优先显示；否则按 **ICCID** 持久化用户填写的 MSISDN（`userData/msisdn-by-iccid.json`）。概览与短信页顶栏显示有效号码；支持 **USSD 查号**（预设如 `*208#`）与从近期短信扫描大陆手机号供选用。**不宣称 CNUM 在空返回时可用**
-5. **通话（实验，v0.5）**：侧栏「通话」— `ATD{num};` / `ATA` / `ATH`，监听 `RING` / `+CLIP` / `CONNECT` / `NO CARRIER`；连接时 `AT+CLIP=1`。可选尝试 `usbcfg` UAC=1（需确认 + 可恢复旧值 + 重启）与 `AT+QPCMV=1,2`（QDC507 上常 ERROR → 提示电脑音频可能无声）
-6. **概览状态板**：运营商、信号、网络、SIM/号码、IMS、端口、ICCID（缩短显示）、注册状态
-7. **启用 IMS**：一键 `AT+QCFG="ims",1`，可选两步软重启 `AT+CFUN=1,1`
+3. **短信会话（PDU，v0.6）**：按对端号码聚合线程（规范化 `+86` / 首位 `0`）；左侧会话列表 + 右侧聊天气泡（收到靠左、发出靠右）；成功发送后把**出站短信**持久化到 `userData`（按 ICCID）；与模组 PDU 收件箱合并；未读角标（`+CMTI` / 轮询）；会话内删除 / 清空会话；仍支持清空 SM。**默认不自动删除**短信
+4. **本机号码（v0.5）**：`AT+CNUM` 若有则优先显示；否则按 **ICCID** 持久化用户填写的 MSISDN（`userData/msisdn-by-iccid.json`）。概览与短信页顶栏显示有效号码；支持 **USSD 查号** 与从近期短信扫描大陆手机号。**不宣称 CNUM 在空返回时可用**
+5. **通话（实验）**：侧栏拨号盘 + 历史日志；`ATD` / `ATA` / `ATH` + `RING` / `+CLIP`。**v0.6**：来电时应用内弹层（接听 / 挂断 / 忽略）+ 可选 Windows Toast；托盘菜单亦可接听/挂断
+6. **托盘与后台（v0.6）**：系统托盘；默认关闭窗口时最小化到托盘（模组保持连接）；托盘菜单：显示主窗口 / 接听 / 挂断 / 退出
+7. **设置页（v0.6）**：开机启动、关闭到托盘、来电系统通知、来电弹窗、启动自动连接模组、托盘闪烁提示（均持久化到 `userData/settings.json`）
+8. **概览状态板** + **启用 IMS**（可选软重启）
+
+### 短信会话 / 托盘怎么用
+
+| 场景 | 操作 |
+|------|------|
+| 看对话 | **短信** → 左侧选号码 → 右侧气泡（左=收到，右=已发送） |
+| 发短信 | 右侧底部填号码与内容 → **发送**（成功后本地会记住出站记录） |
+| 未读 | 会话列表角标 / 侧栏红点；点开会话即标记已读 |
+| 关窗不退出 | **设置** 打开「关闭窗口时最小化到托盘」→ 关窗后托盘图标仍在，模组不断开 |
+| 开机启动 | **设置** → 「开机启动」 |
+| 来电 | Toast 通知 + 应用内弹窗；托盘右键也可接听/挂断 |
 
 ### 国内移动卡 / 本机号码
 
-- 中国移动等 SIM 上 **`AT+CNUM` 经常为空**，属正常现象，不代表模块读不到卡
-- 请用「保存本机号码」（按 ICCID 记住）或「USSD 查号」；也可从短信正文里检出的号码一键保存
-- 换卡（ICCID 变化）后输入框会清空，需重新保存
+- 中国移动等 SIM 上 **`AT+CNUM` 经常为空**，属正常现象
+- 请用「保存本机号码」（按 ICCID 记住）或「USSD 查号」
+- 换卡（ICCID 变化）后输入框会清空，需重新保存；短信出站记录也按 ICCID 分桶
 
 ### 语音（实验）说明
 
-- 语音呼叫需要 **IMS 已注册**（目标 `IMS=1,1`）；未注册时 UI 会警告
-- **通话控制**（拨打/接听/挂断）走标准 AT；**电脑扬声器/麦克风音频**依赖 USB UAC / `QPCMV`，QDC507 固件上经常不可用——此时仍可测信令，但可能无声
+- 语音呼叫需要 **IMS 已注册**（目标 `IMS=1,1`）
+- **通话控制**走标准 AT；**电脑音频**依赖 USB UAC / `QPCMV`，QDC507 上经常不可用
 - 修改 `usbcfg` 有风险：仅通过明确按钮操作，并保存旧值可恢复
 
 ### 漫游物联网卡 / 收信说明
 
 - 发短信请发到本机显示的**国际号码**（如 `+44…`）
-- 英国等 IoT SIM 在中国漫游时，收信常依赖 **IMS 注册**；仅打开应用无法解决运营商侧未投递
-- 诊断中常见：SM/ME/MT 均为 0 条、`IMS=1,0`（已启用未注册）——需要网络侧注册成功后才能稳定收信
+- 英国等 IoT SIM 在中国漫游时，收信常依赖 **IMS 注册**
 
 ---
 
@@ -44,8 +55,8 @@
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.5.0
-   git push origin v0.5.0
+   git tag v0.6.0
+   git push origin v0.6.0
    ```
 2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版，并创建 GitHub Release
 3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行
@@ -60,26 +71,28 @@
 2. 运行 `DJI-4G-Windows-Toolkit`
 3. **驱动** → **一键安装驱动** → 同意 UAC
 4. **诊断** → **检测模块**，确认出现 `Quectel USB AT Port`
-5. **概览** 查看 / 保存本机号码（CNUM 或按 ICCID 手动 / USSD）；**短信** 收发与多选删除；需要时在「诊断」启用 IMS 或软重启
-6. **通话（实验）** 在 IMS 已注册时拨打 / 接听 / 挂断；音频路径为实验项
+5. **概览** 查看 / 保存本机号码；**短信** 按会话收发；**设置** 按需打开托盘 / 开机启动 / 来电通知
+6. **通话（实验）** 在 IMS 已注册时拨打；来电时用弹窗或托盘接听/挂断
 7. 若需要上网且当前无 WWAN：**驱动** → **安装上网驱动 (qcwwan)**（已能上网则跳过）
 
 **注意**
 
 - 安装驱动需要管理员权限
 - 连接时**不会**自动删除 SIM / 模组内短信
-- 收信失败时优先核对：国际号码、IMS 注册、运营商投递，而不仅是本工具 UI
+- 默认关窗进托盘；要从托盘菜单选「退出」才真正退出
 
 ---
 
 ## 从源码运行（开发）
 
-需要 Node.js LTS（Windows 上调试串口/驱动；Linux 仅可检查结构 / PDU 单元逻辑）。
+需要 Node.js LTS（Windows 上调试串口/驱动；Linux 仅可检查结构 / PDU / 会话单元逻辑）。
 
 ```powershell
 cd dji-4g-windows-toolkit
 npm install
 npm start
+npm run check:pdu
+npm run check:threads
 ```
 
 打包（请在 Windows 上执行，或依赖 GitHub Actions）：
@@ -104,18 +117,22 @@ npm run build
 ## 架构（摘要）
 
 ```
-electron/main.js      BrowserWindow + IPC
-electron/preload.js   contextBridge API
-src/index.html        控制台壳（侧栏 + 多视图）
-src/styles.css        自研浅/深色主题
-src/renderer.js       视图切换 / 状态板 / SMS / 本机号码 / 通话 UI
-src/device.js         端口 / PnP / ATI
-src/modem.js          AT 串口（PDU、CMTI、IMS、USSD、语音 ATD/ATA/ATH、usbcfg/QPCMV）
-src/msisdn-store.js   按 ICCID 持久化本机号码 + 号码提取
-src/pdu.js            MIT 自研 SMS PDU 编解码
-src/driver.js         捆绑驱动路径 + 提权安装
+electron/main.js         BrowserWindow + Tray + Toast + IPC
+electron/preload.js      contextBridge API
+src/index.html           控制台壳（侧栏 + 多视图 + 来电弹层）
+src/styles.css           自研浅/深色主题 + 会话气泡
+src/renderer.js          视图 / 会话 UI / 来电弹窗 / 设置
+src/device.js            端口 / PnP / ATI
+src/modem.js             AT 串口（PDU、CMTI、IMS、USSD、语音）
+src/msisdn-store.js      按 ICCID 持久化本机号码
+src/sms-thread-store.js  按 ICCID 持久化出站短信 + 线程合并
+src/settings-store.js    应用设置持久化
+src/phone-normalize.js   对端号码规范化（+86 / 首位 0）
+src/pdu.js               MIT 自研 SMS PDU 编解码
+src/driver.js            捆绑驱动路径 + 提权安装
 scripts/Install-Drivers.ps1
 drivers/windows10/
+build/icon.png           托盘 / 窗口图标
 ```
 
 ---
@@ -125,9 +142,9 @@ drivers/windows10/
 - 本仓库自有代码：**MIT**，Copyright 2026 cnsunsz（见 [`LICENSE`](LICENSE)）
 - Quectel 驱动二进制：专有，见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 早期文本模式短信思路参考 MIT 项目 [ctexcel-sms-dji](https://github.com/ywang3129-cell/ctexcel-sms-dji)
-- **v0.3 PDU / 状态 / IMS 流程**受 macOS 侧 DJI 4G 工具（如 **DJOneHub / DJ4Hub / DJIC**）常见 AT 用法启发；实现为对照 **3GPP AT/PDU 惯例**的清洁重写。**未复制** DJOneHub 的 PolyForm Noncommercial 源码
-- **v0.4 UI**：侧栏控制台 / 状态磁贴 / 浅深色主题在视觉上受 **VoHive**（`6mb/vohive` 等）与 **DJOneHub** mac 控制台启发；本仓库 `src/` 下 HTML/CSS/JS 为**原创 MIT 实现**，**不包含** PolyForm Noncommercial 源码。详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-- **v0.5**：本机号码持久化 / USSD / 实验语音 AT 流程受 macOS 侧同类工具常见 AT 用法启发（`ATD…;`、`ATA`、`ATH`、`CLIP`、`CUSD`、`QCFG="usbcfg"`、`QPCMV`）；实现为对照 **3GPP / Quectel 公开 AT** 的清洁重写，**未复制** PolyForm 源码
+- **v0.3–v0.5** PDU / 状态 / IMS / 本机号码 / 实验语音：受 macOS 侧同类工具常见 AT 用法启发；实现为对照 **3GPP / Quectel 公开 AT** 的清洁重写，**未复制** PolyForm 源码
+- **v0.4 UI**：侧栏控制台视觉受 VoHive / DJOneHub 启发；HTML/CSS/JS 为**原创 MIT**
+- **v0.6**：手机式会话气泡 / 来电弹窗 / 托盘通知为原创 MIT 实现（手机/桌面通话 UX 灵感，无第三方源码复制）
 
 所用技术（`CMGF=0`、`CMGL=4`、`CNMI`、`QCFG="ims"`、CNUM/CCID、`ATD`/`ATA`/`ATH`、`CUSD` 等）均为公开调制解调器 AT 实践。
 
@@ -137,14 +154,13 @@ drivers/windows10/
 
 **DJI 4G Windows Toolkit** — Electron helper for DJI Cellular Gen1 / Baiwang **QDC507** (`USB 2CA3:4006`).
 
-- Quectel USB driver install (AT/DM/filter; WWAN skipped by default)
-- In-window **PDU** SMS (list SM/ME/MT, decode Deliver, PDU submit, `+CMTI` listen; no auto-delete)
-- Overview status tiles: operator, signal, network, SIM/MSISDN, IMS, port, ICCID, registration
-- Local MSISDN helper (v0.5): CNUM if present, else ICCID-keyed saved number / USSD / SMS scan — CNUM often empty on CMCC
-- Experimental voice (v0.5): AT dial/answer/hangup + CLIP URCs; USB audio / QPCMV optional and often unavailable on QDC507
-- IMS enable (+ optional soft reboot); light/dark theme with sidebar navigation (v0.4+)
-- Voice needs IMS registered; roaming IoT SIMs often need IMS before inbound SMS works
+- Quectel USB driver install (AT/DM/filter; WWAN optional)
+- In-window **PDU** SMS with **threaded chat UI** (v0.6): normalize +86 / leading 0, outbound persisted by ICCID, unread badges
+- Overview tiles + MSISDN helper (CNUM / ICCID-saved / USSD / SMS scan)
+- Experimental voice: AT dial/answer/hangup; **incoming call popup + Windows toast + tray** (v0.6)
+- Settings: launch at login, close-to-tray, notify/popup, auto-connect
+- IMS enable; light/dark theme
 
 **Release:** push `v*` tag → Actions builds on `windows-latest` → Release assets.
 
-UI *look-and-feel* inspired by VoHive / DJOneHub dashboards (**inspiration only**; **no PolyForm code copied**). Modem flows inspired by common AT practice and prior art such as DJOneHub/DJIC (techniques only). Not affiliated with DJI or Quectel.
+Not affiliated with DJI or Quectel. MIT for first-party code; no PolyForm Noncommercial source copied.

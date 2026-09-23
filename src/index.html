@@ -44,6 +44,10 @@
           <span class="rail-ico" aria-hidden="true">⌘</span>
           <span class="rail-label">诊断</span>
         </button>
+        <button type="button" class="rail-item" data-view="settings" role="tab" aria-selected="false">
+          <span class="rail-ico" aria-hidden="true">☰</span>
+          <span class="rail-label">设置</span>
+        </button>
       </nav>
       <div class="rail-foot">
         <button type="button" id="btnTheme" class="theme-toggle" title="切换浅色/深色">浅色</button>
@@ -126,43 +130,40 @@
         </section>
 
         <!-- SMS -->
-        <section class="view" id="view-sms" data-title="短信" data-sub="PDU 收发 · SM / ME / MT · +CMTI 监听">
+        <section class="view" id="view-sms" data-title="短信" data-sub="会话线程 · PDU 收发 · 本地已发送持久化">
           <div class="own-bar" id="smsOwnBar">
             <span class="own-bar-k">本机号码</span>
             <strong id="smsOwnNumber">未设置</strong>
             <span id="smsOwnSource" class="source-pill">未设置</span>
           </div>
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <p class="kicker">COMPOSE</p>
-                <h2>发送短信</h2>
-              </div>
-            </div>
-            <div class="compose-row">
-              <input id="smsTo" type="tel" placeholder="接收号码，如 +86138…" autocomplete="off">
-              <input id="smsText" type="text" placeholder="短信内容（中文 UCS2，英文优先 GSM7）" autocomplete="off">
-              <button type="button" class="btn primary" id="btnSend">发送</button>
-            </div>
-          </div>
 
-          <div class="panel inbox-panel">
-            <div class="panel-head">
-              <div>
-                <p class="kicker">INBOX</p>
-                <h2>收件箱（PDU）</h2>
+          <div class="chat-shell">
+            <aside class="thread-list-panel">
+              <div class="thread-list-head">
+                <input id="threadSearch" type="search" placeholder="搜索号码或内容…" autocomplete="off">
+                <button type="button" class="btn ghost tiny" id="btnNewThread" title="新建会话">新建</button>
               </div>
-              <div class="panel-head-right">
-                <p class="panel-note">约每 15 秒自动刷新；不会在读取时自动删除</p>
+              <div id="threadList" class="thread-list" aria-live="polite"></div>
+            </aside>
+
+            <div class="thread-chat-panel">
+              <div class="thread-chat-head">
+                <div>
+                  <strong id="threadPeerTitle">选择会话</strong>
+                  <span id="threadPeerSub" class="muted-line" style="margin:0">左侧选择号码查看对话</span>
+                </div>
                 <div class="btn-row wrap">
-                  <button type="button" class="btn ghost" id="btnSmsSelectAll">全选</button>
-                  <button type="button" class="btn ghost" id="btnSmsSelectNone">取消全选</button>
-                  <button type="button" class="btn ghost danger-ghost" id="btnSmsDeleteSelected">删除所选</button>
-                  <button type="button" class="btn ghost danger-ghost" id="btnSmsClearSm">清空当前存储 (SM)</button>
+                  <button type="button" class="btn ghost tiny danger-ghost" id="btnClearThread" hidden>清空会话</button>
+                  <button type="button" class="btn ghost tiny danger-ghost" id="btnSmsClearSm">清空 SM 存储</button>
                 </div>
               </div>
+              <div id="chatBubbles" class="chat-bubbles" aria-live="polite"></div>
+              <div class="chat-compose">
+                <input id="smsTo" type="tel" placeholder="对方号码，如 138… / +86138…" autocomplete="off">
+                <input id="smsText" type="text" placeholder="输入短信内容…" autocomplete="off">
+                <button type="button" class="btn primary" id="btnSend">发送</button>
+              </div>
             </div>
-            <div id="smsList" class="inbox" aria-live="polite"></div>
           </div>
         </section>
 
@@ -276,9 +277,93 @@
             </div>
           </div>
         </section>
+
+        <!-- Settings -->
+        <section class="view" id="view-settings" data-title="设置" data-sub="开机启动 · 托盘 · 来电通知 / 弹窗 · 自动连接">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">APP</p>
+                <h2>通用</h2>
+              </div>
+            </div>
+            <div class="settings-list">
+              <label class="settings-row">
+                <div>
+                  <strong>开机启动</strong>
+                  <span>登录 Windows 时自动打开本工具</span>
+                </div>
+                <input type="checkbox" id="setOpenAtLogin">
+              </label>
+              <label class="settings-row">
+                <div>
+                  <strong>关闭窗口时最小化到托盘</strong>
+                  <span>关闭主窗口不退出；模组保持连接。托盘菜单可「退出」</span>
+                </div>
+                <input type="checkbox" id="setCloseToTray">
+              </label>
+              <label class="settings-row">
+                <div>
+                  <strong>启动时自动连接模组</strong>
+                  <span>打开应用后自动搜索 AT 口并连接</span>
+                </div>
+                <input type="checkbox" id="setAutoConnect">
+              </label>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">CALL</p>
+                <h2>来电</h2>
+              </div>
+            </div>
+            <div class="settings-list">
+              <label class="settings-row">
+                <div>
+                  <strong>来电时系统通知</strong>
+                  <span>Windows 通知中心 Toast（支持时含接听/挂断操作）</span>
+                </div>
+                <input type="checkbox" id="setNotifyOnCall">
+              </label>
+              <label class="settings-row">
+                <div>
+                  <strong>来电弹窗</strong>
+                  <span>应用内 Mac 风格弹层：接听 / 挂断 / 忽略</span>
+                </div>
+                <input type="checkbox" id="setPopupOnCall">
+              </label>
+              <label class="settings-row">
+                <div>
+                  <strong>托盘图标闪烁提示</strong>
+                  <span>振铃/未接时刷新托盘提示文案</span>
+                </div>
+                <input type="checkbox" id="setFlashTrayOnRing">
+              </label>
+            </div>
+            <p class="muted-line" id="settingsSaveNote" style="margin-top:12px">设置保存在本机 userData，立即生效。</p>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
+
+  <!-- Incoming call overlay -->
+  <div id="callPopup" class="call-popup" hidden role="dialog" aria-modal="true" aria-labelledby="callPopupNumber">
+    <div class="call-popup-card">
+      <p class="call-popup-kicker">来电</p>
+      <h2 id="callPopupNumber">—</h2>
+      <p class="call-popup-sub" id="callPopupSub">振铃中…</p>
+      <div class="call-popup-actions">
+        <button type="button" class="btn call-answer" id="btnPopupAnswer">接听</button>
+        <button type="button" class="btn call-decline" id="btnPopupHangup">挂断</button>
+        <button type="button" class="btn ghost" id="btnPopupIgnore">忽略</button>
+      </div>
+    </div>
+  </div>
+
   <script src="renderer.js"></script>
 </body>
 </html>

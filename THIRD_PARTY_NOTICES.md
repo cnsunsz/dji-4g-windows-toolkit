@@ -69,6 +69,15 @@ Required notice (inspiration credit only — we do **not** redistribute their co
 
 Exact versions: see `package.json` / `package-lock.json` after `npm install`.
 
+
+## Phone-like UX (v0.6)
+
+SMS conversation threads, incoming-call overlay, system tray, and Windows toast
+notifications are **original MIT** implementations in this repository. They take
+general inspiration from common smartphone / desktop telephony UX patterns and
+from prior-art *look-and-feel* of tools such as DJOneHub / VoHive — **inspiration
+only**; no PolyForm Noncommercial (or other non-MIT) source was copied.
+
 ## Trademarks
 
 DJI, Quectel, Baiwang, Windows, and other names are trademarks of their respective
