@@ -28,19 +28,18 @@ with, endorsed by, or sponsored by DJI or Quectel**.
 SMS AT-port detection, text-mode CMGF/CMGL/CMGS flow, and UCS2 handling for Chinese
 SMS were informed by ideas from the MIT-licensed project
 [ctexcel-sms-dji](https://github.com/ywang3129-cell/ctexcel-sms-dji)
-(Copyright 2026 ywang3129-cell). This toolkit ships a **slim** Flask + pyserial
+(Copyright 2026 ywang3129-cell). This toolkit ships a **slim** Electron + serialport
 implementation and does **not** copy that project's full application, Telegram bot,
 or installer. Upstream license terms continue to apply to any substantial excerpts
 if present; attribute accordingly.
 
-## Python dependencies
+## Electron / Node dependencies
 
-- Flask / Werkzeug / Jinja2 / itsdangerous / click / MarkupSafe — BSD/MIT-family
-- pyserial — BSD
-- requests — Apache License 2.0 (and its transitive dependencies)
-- PyInstaller (dev / Windows build) — see PyInstaller license terms
+- Electron — see Electron / Chromium / Node license notices shipped by Electron
+- serialport — MIT
+- electron-builder (dev / Windows build) — MIT
 
-Exact pins: see `requirements.txt`.
+Exact versions: see `package.json` / `package-lock.json` after `npm install`.
 
 ## Trademarks
 

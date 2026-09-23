@@ -1,0 +1,149 @@
+:root {
+  --bg: #0f1419;
+  --card: #1a2332;
+  --text: #e7ecf3;
+  --muted: #8b9bb4;
+  --accent: #3d8bfd;
+  --ok: #3dd68c;
+  --bad: #ff6b6b;
+  --border: #2a3648;
+  --input: #0c1118;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.hdr h1 {
+  font-size: 1.35rem;
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.ver {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.sub {
+  color: var(--muted);
+  margin: 0 0 18px;
+  font-size: 0.92rem;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.card h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+input, textarea {
+  width: 100%;
+  background: var(--input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 6px 0 10px;
+  font: inherit;
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font: inherit;
+}
+
+button.secondary { background: #2a3648; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.log, .status {
+  margin: 12px 0 0;
+  padding: 12px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-height: 220px;
+  overflow: auto;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.status.ok { color: var(--ok); border-color: #245c43; }
+.status.bad { color: var(--bad); border-color: #6b2e2e; }
+
+.send-box { margin-top: 14px; }
+
+.inbox-title {
+  margin: 18px 0 6px;
+  font-size: 1rem;
+}
+
+.msg {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.msg:first-child { border-top: 0; }
+
+.meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+
+.body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

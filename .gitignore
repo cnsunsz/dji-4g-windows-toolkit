@@ -1,17 +1,24 @@
-# Python
+# Node / Electron
+node_modules/
+dist/
+out/
+*.log
+npm-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# Python (legacy leftovers)
 __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
 .eggs/
-dist/
-build/
 *.egg
 .venv/
 venv/
 .env
 
-# PyInstaller
+# PyInstaller (legacy)
 *.manifest
 *.spec
 
@@ -23,6 +30,6 @@ venv/
 Thumbs.db
 
 # Logs / temp
-*.log
 logs/
 _driver_install.log
+release-out/

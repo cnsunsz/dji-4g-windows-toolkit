@@ -1,0 +1,71 @@
+{
+  "name": "dji-4g-windows-toolkit",
+  "version": "0.2.0",
+  "description": "DJI 4G Windows Toolkit — Electron app for Quectel driver install and SMS via USB AT port",
+  "main": "electron/main.js",
+  "author": "cnsunsz",
+  "license": "MIT",
+  "homepage": "https://github.com/cnsunsz/dji-4g-windows-toolkit",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cnsunsz/dji-4g-windows-toolkit.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "pack": "electron-builder --dir --win"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.cnsunsz.dji4gtoolkit",
+    "productName": "DJI-4G-Windows-Toolkit",
+    "copyright": "Copyright © 2026 cnsunsz",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "drivers/windows10",
+        "to": "drivers/windows10"
+      },
+      {
+        "from": "scripts/Install-Drivers.ps1",
+        "to": "scripts/Install-Drivers.ps1"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "DJI 4G Windows Toolkit"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
+  }
+}

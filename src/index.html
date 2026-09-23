@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DJI 4G Windows Toolkit</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header class="hdr">
+      <h1>DJI 4G Windows Toolkit <span id="ver" class="ver"></span></h1>
+      <p class="sub">DJI Cellular Gen1 / Baiwang QDC507（USB 2CA3:4006）· Quectel AT/SMS · 统一窗口内完成驱动 / 检测 / 短信</p>
+    </header>
+
+    <section class="card" id="sec-driver">
+      <h2>驱动</h2>
+      <div class="row">
+        <button type="button" id="btnDrivers">一键安装驱动</button>
+        <span class="hint">安装 qcser / qcmdm / qcfilter（默认不装 qcwwan）· 需 UAC</span>
+      </div>
+      <pre id="driverLog" class="log" aria-live="polite">就绪。建议顺序：安装驱动 → 检测模块 → 使用短信。</pre>
+    </section>
+
+    <section class="card" id="sec-module">
+      <h2>模块</h2>
+      <div class="row">
+        <button type="button" id="btnDetect">检测模块</button>
+      </div>
+      <pre id="moduleLog" class="log" aria-live="polite">点击「检测模块」查看 USB / AT 口 / ATI。</pre>
+    </section>
+
+    <section class="card" id="sec-sms">
+      <h2>短信</h2>
+      <div class="row" style="margin-bottom:10px">
+        <button type="button" id="btnSmsRefresh">刷新状态 / 短信</button>
+        <button type="button" class="secondary" id="btnSmsReconnect">重新连接</button>
+      </div>
+      <div id="smsStatus" class="status">未连接</div>
+
+      <div class="send-box">
+        <label for="smsTo">号码</label>
+        <input id="smsTo" placeholder="+86138...." autocomplete="off">
+        <label for="smsText">内容（中文自动 UCS2）</label>
+        <textarea id="smsText" placeholder="短信内容"></textarea>
+        <button type="button" id="btnSend">发送</button>
+      </div>
+
+      <h3 class="inbox-title">收件箱</h3>
+      <p class="hint">连接后约每 15 秒自动刷新；连接时不会自动删除 SIM 短信。</p>
+      <div id="smsList"></div>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

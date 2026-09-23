@@ -1,5 +1,0 @@
-flask>=3.0,<4
-pyserial>=3.5
-requests>=2.31
-# Dev / CI (Windows EXE via GitHub Actions or local scripts/build_windows.ps1)
-pyinstaller>=6.0

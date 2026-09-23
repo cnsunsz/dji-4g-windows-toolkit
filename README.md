@@ -1,6 +1,6 @@
 # DJI 4G Windows Toolkit
 
-面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows 工具箱：一键安装 Quectel USB 驱动（AT/DM/NMEA/Modem/filter），并通过 Quectel USB AT Port 收发短信。
+面向 **DJI 第一代 4G 模块（Cellular Gen1 / Baiwang QDC507，USB VID:PID `2CA3:4006`）** 的 Windows **Electron** 桌面工具箱：一键安装 Quectel USB 驱动（AT/DM/filter），并在**同一窗口内**通过 Quectel USB AT Port 收发短信。
 
 仓库：<https://github.com/cnsunsz/dji-4g-windows-toolkit>
 
@@ -10,77 +10,67 @@
 
 ## 功能
 
-1. **Windows EXE**（Tkinter GUI）：一键装驱动 / 检测模块 / 启动短信网页
+1. **Electron 桌面应用**：驱动安装 / 模块检测 / 短信收发全部在一个窗口内完成（不再打开外部浏览器或本地网页）
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS，管理员一键 `pnputil` 安装 `qcser` / `qcmdm` / `qcfilter`（默认**不**安装 `qcwwan`，以免覆盖已可用的百网 WWAN）
-3. **短信**：本地网页 `http://127.0.0.1:7598/`（避开 ctexcel 常用的 7597），自动寻找 `Quectel USB AT Port`，文本模式 CMGF/CMGL/CMGS，中文 UCS2
-4. **语音/通话不在 v1 范围**（IMS 通常关闭）— 仅短信与驱动
+3. **短信**：串口 AT（115200），文本模式 CMGF/CMGL/CMGS，中文 UCS2；连接时**不会**自动删除 SIM 短信
+4. **语音/通话不在范围**（IMS 通常关闭）— 仅短信与驱动
 
-已在 QDC507 + COM3（Quectel USB AT Port）场景验证 AT 可用。
+已在 QDC507 + Quectel USB AT Port 场景验证 AT 可用。
 
 ---
 
-## 下载 Release EXE（推荐）
+## 下载 Release（推荐）
 
 **不需要在本地电脑编译。** 发布流程走 GitHub Actions：
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v0.2.0
+   git push origin v0.2.0
    ```
-2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上安装 Python、PyInstaller，打出 onefile GUI EXE（内含 `drivers/windows10`），并创建 GitHub Release，上传：
-   - `DJI-4G-Windows-Toolkit.exe`
-   - `DJI-4G-Windows-Toolkit.exe.sha256`
-3. 用户到仓库 **Releases** 页下载 EXE，校验 SHA256 后运行。
+2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版（内含 `drivers/windows10` 与 `Install-Drivers.ps1`），并创建 GitHub Release，上传例如：
+   - `DJI-4G-Windows-Toolkit-*-portable.exe`（便携）
+   - `DJI-4G-Windows-Toolkit-*-Setup.exe` / NSIS 安装包
+   - 对应 `.sha256`
+3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行。
 
 也可在 Actions 页手动 **workflow_dispatch**（可填 tag 直接发 Release，或不填 tag 只留 artifact）。
 
 ---
 
-## 使用 EXE
+## 使用
 
 1. 插入 DJI 第一代 4G 模块（或对应 USB 网卡）
-2. 运行 `DJI-4G-Windows-Toolkit.exe`
-3. 点击 **一键安装驱动** → 同意 UAC → 等待 pnputil 完成（日志：`%TEMP%\dji-4g-toolkit-driver-install.log`）
-4. 点击 **检测模块状态**，确认出现 `Quectel USB AT Port`（如 COM3）及 ATI
-5. 点击 **启动短信服务**，浏览器打开 `http://127.0.0.1:7598/` 收发短信
-6. 之后可用 **打开短信页面** 再次打开
+2. 运行 `DJI-4G-Windows-Toolkit`（便携 EXE 或安装后的快捷方式）
+3. **驱动** → **一键安装驱动** → 同意 UAC → 等待 pnputil 完成（日志：`%TEMP%\dji-4g-toolkit-driver-install.log`）
+4. **模块** → **检测模块**，确认出现 `Quectel USB AT Port` 及 ATI
+5. **短信** 区查看连接状态、刷新收件箱、发送短信（连接成功后约每 15 秒自动刷新）
 
 **注意**
 
 - 安装驱动需要管理员权限
 - 短信可用；语音通常不可用（IMS off）
-- 连接时**不会**自动删除 SIM 内短信（比部分上游默认行为更保守）
+- 连接时**不会**自动删除 SIM 内短信
 
 ---
 
 ## 从源码运行（开发）
 
+需要 Node.js LTS（Windows 上调试串口/驱动；Linux 仅可检查结构）。
+
 ```powershell
 cd dji-4g-windows-toolkit
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m app.main
+npm install
+npm start
 ```
 
-单独启动短信服务：
+打包（请在 Windows 上执行，或依赖 GitHub Actions）：
 
 ```powershell
-python -m app.sms_server
+npm run build
 ```
 
----
-
-## 本地编译 EXE（可选备用）
-
-主路径是 **GitHub Actions**。若需在本机 Windows（Python 3.11+）试编译：
-
-```powershell
-.\scripts\build_windows.ps1
-```
-
-产物：`dist\DJI-4G-Windows-Toolkit.exe`。
+产物在 `dist/`。
 
 ---
 
@@ -94,6 +84,21 @@ python -m app.sms_server
 
 ---
 
+## 架构（摘要）
+
+```
+electron/main.js      BrowserWindow + IPC
+electron/preload.js   contextBridge API
+src/index.html        单页 UI（驱动 / 模块 / 短信）
+src/device.js         端口 / PnP / ATI
+src/modem.js          AT 串口短信（CMGF/CMGL/CMGS + UCS2）
+src/driver.js         捆绑驱动路径 + 提权安装
+scripts/Install-Drivers.ps1
+drivers/windows10/
+```
+
+---
+
 ## 许可
 
 - 本仓库自有代码：**MIT**，Copyright 2026 cnsunsz（见 [`LICENSE`](LICENSE)）
@@ -104,13 +109,13 @@ python -m app.sms_server
 
 ## English
 
-**DJI 4G Windows Toolkit** — Windows helper for the DJI Cellular Gen1 / Baiwang **QDC507** module (`USB VID:PID 2CA3:4006`).
+**DJI 4G Windows Toolkit** — Electron desktop helper for the DJI Cellular Gen1 / Baiwang **QDC507** module (`USB VID:PID 2CA3:4006`).
 
 - One-click Quectel USB driver install (AT/DM/filter; WWAN skipped by default)
-- Local SMS UI on `127.0.0.1:7598` via Quectel USB AT Port (UCS2 for Chinese)
-- Voice/calls out of scope for v1 (IMS usually off)
+- In-window SMS UI via Quectel USB AT Port (UCS2 for Chinese) — no external browser
+- Voice/calls out of scope (IMS usually off)
 
-**Get the EXE:** push a `v*` tag → GitHub Actions builds on `windows-latest` → Release assets appear. No local Windows build required for end users or for maintainers who prefer CI.
+**Get the EXE:** push a `v*` tag → GitHub Actions builds on `windows-latest` with electron-builder → Release assets appear.
 
 Repo: <https://github.com/cnsunsz/dji-4g-windows-toolkit>
 
