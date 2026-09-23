@@ -1,0 +1,306 @@
+;-------------------------------------------------------------------------------
+; qcfilter.INF
+;
+; Quectel Wireless Composite Device
+;
+; Copyright (c) 2014 Quectel Technologies, Inc.
+; All rights reserved.
+;-------------------------------------------------------------------------------
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = USB
+Provider    = %QUECTEL%
+ClassGUID   = {36FC9E60-C465-11CF-8056-444553540000}
+DriverVer = 03/02/2023,15.26.53.939
+CatalogFile = qcfilter.cat
+
+[Manufacturer]
+%QUECTEL%  = QuectelFilter,NTx86,NTamd64
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[SourceDisksNames.x86]
+1000 = %QcomSrcDisk%,"",,\filter\i386
+
+[SourceDisksNames.amd64]
+1001 = %QcomSrcDisk%,"",,\filter\amd64
+
+[SourceDisksFiles.x86]
+qcusbfilter.sys  = 1000
+
+[SourceDisksFiles.amd64]
+qcusbfilter.sys  = 1001
+
+[QuectelFilter.NTx86]
+;GW
+%qcfilter.DeviceDesc_GW%     = qcfilter, USB\VID_3763&PID_3C93
+;SDX12
+%qcfilter.DeviceDesc0435%     = qcfilter, USB\VID_2C7C&PID_030B
+;AG35
+%qcfilter.DeviceDesc0435%     = qcfilter, USB\VID_2C7C&PID_0435
+;BG96
+%qcfilter.DeviceDesc0296%     = qcfilter, USB\VID_2C7C&PID_0296
+;EC21 EC25 EC20 R2.0
+%qcfilter.DeviceDesc0125%     = qcfilter, USB\VID_2C7C&PID_0125
+%qcfilter.DeviceDesc0121%     = qcfilter, USB\VID_2C7C&PID_0121
+;EP06 EM06 EM06
+%qcfilter.DeviceDesc0306%     = qcfilter, USB\VID_2C7C&PID_0306
+;EG91 EG95
+%qcfilter.DeviceDesc0191%     = qcfilter, USB\VID_2C7C&PID_0191
+%qcfilter.DeviceDesc0195%     = qcfilter, USB\VID_2C7C&PID_0195
+;SDx20
+%qcfilter.DeviceDesc0512%     = qcfilter, USB\VID_2C7C&PID_0512
+;AG15
+%qcfilter.DeviceDesc0415%     = qcfilter, USB\VID_2C7C&PID_0415
+;EG61
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0161
+;SDx24
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0620
+;RG500Q
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0800
+;AG520
+;%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0452
+;BG95
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0700
+;AG550Q
+;%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0455
+
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6001
+
+; EM05G
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_030A
+
+;RM520N-GL
+%qcfilter.DeviceDesc_HighSpeed%     = qcfilter, USB\VID_2C7C&PID_0801
+
+;SDX7X
+%qcfilter.DeviceDesc_HighSpeed%     = qcfilter, USB\VID_2C7C&PID_0122
+
+; EM05CN
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0310
+
+; EM05G 标准项目
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_030E
+
+; EM061KGL
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6008
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6009
+
+;EM162RGL
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6020
+
+[QuectelFilter.NTamd64]
+;SDX12
+%qcfilter.DeviceDesc0435%     = qcfilter, USB\VID_2C7C&PID_030B
+
+%qcfilter.DeviceDesc0125%     = qcfilter, USB\VID_2CA3&PID_4006
+;GW
+%qcfilter.DeviceDesc_GW%     = qcfilter, USB\VID_3763&PID_3C93
+;AG35
+%qcfilter.DeviceDesc0435%     = qcfilter, USB\VID_2C7C&PID_0435
+;BG96
+%qcfilter.DeviceDesc0296%     = qcfilter, USB\VID_2C7C&PID_0296
+;EC21 EC25 EC20 R2.0
+%qcfilter.DeviceDesc0125%     = qcfilter, USB\VID_2C7C&PID_0125
+%qcfilter.DeviceDesc0125%     = qcfilter, USB\VID_2C7C&PID_4006
+%qcfilter.DeviceDesc0121%     = qcfilter, USB\VID_2C7C&PID_0121
+;EP06 EM06 EM06
+%qcfilter.DeviceDesc0306%     = qcfilter, USB\VID_2C7C&PID_0306
+;EG91 EG95
+%qcfilter.DeviceDesc0191%     = qcfilter, USB\VID_2C7C&PID_0191
+%qcfilter.DeviceDesc0195%     = qcfilter, USB\VID_2C7C&PID_0195
+;SDx20 EM12 EG12
+%qcfilter.DeviceDesc0512%     = qcfilter, USB\VID_2C7C&PID_0512
+;AG15
+%qcfilter.DeviceDesc0415%     = qcfilter, USB\VID_2C7C&PID_0415
+;EG61
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0161
+;SDx24
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0620
+;RG500Q
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0800
+;AG520
+;%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0452
+;BG95
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0700
+;AG550Q
+;%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0455
+
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6001
+
+; EM05G
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_030A
+
+;RM520N-GL
+%qcfilter.DeviceDesc_HighSpeed%     = qcfilter, USB\VID_2C7C&PID_0801
+
+;SDX7X
+%qcfilter.DeviceDesc_HighSpeed%     = qcfilter, USB\VID_2C7C&PID_0122
+
+; EM05CN
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_0310
+
+; EM05G 标准项目
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_030E
+
+; EM061KGL
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6008
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6009
+
+;EM162RGL
+%qcfilter.DeviceDesc_HighSpeed% = qcfilter, USB\VID_2C7C&PID_6020
+
+[qcfilter.NT]  
+;-----------------------------------------------------------------
+; Get the standard stuff from USB.inf
+;-----------------------------------------------------------------
+Include   = USB.inf
+Needs     = Composite.Dev.NT
+CopyFiles = qcfilter.NT.Copy
+
+[qcfilter2.NT]  
+;-----------------------------------------------------------------
+; Get the standard stuff from USB.inf
+;-----------------------------------------------------------------
+Include   = USB.inf
+Needs     = Composite.Dev.NT
+CopyFiles = qcfilter2.NT.Copy
+AddReg    = qcfilterAddReg2
+
+[qcfilter3.NT]  
+;-----------------------------------------------------------------
+; Get the standard stuff from USB.inf
+;-----------------------------------------------------------------
+Include   = USB.inf
+Needs     = Composite.Dev.NT
+CopyFiles = qcfilter3.NT.Copy
+AddReg    = qcfilterAddReg3
+
+[qcfilter4.NT]  
+;-----------------------------------------------------------------
+; Get the standard stuff from USB.inf
+;-----------------------------------------------------------------
+Include   = USB.inf
+Needs     = Composite.Dev.NT
+CopyFiles = qcfilter4.NT.Copy
+AddReg    = qcfilterAddReg4
+
+[qcfilterAddReg2]
+
+; Support Muxing
+HKR,, QCDeviceMuxEnable, 0x00010001, 0x00000001
+
+; Start Interface
+HKR,, QCDeviceStartIf, 0x00010001, 0x00000002
+
+; Number of Interfaces
+HKR,, QCDeviceNumIf, 0x00010001, 0x00000001
+
+; Number of Mux Interfaces
+HKR,, QCDeviceNumMuxIf, 0x00010001, 0x00000007
+
+[qcfilterAddReg3]
+
+; Support Muxing
+HKR,, QCDeviceMuxEnable, 0x00010001, 0x00000001
+
+; Start Interface
+HKR,, QCDeviceStartIf, 0x00010001, 0x00000003
+
+; Number of Interfaces
+HKR,, QCDeviceNumIf, 0x00010001, 0x00000001
+
+; Number of Mux Interfaces
+HKR,, QCDeviceNumMuxIf, 0x00010001, 0x00000007
+
+[qcfilterAddReg4]
+
+; Support Muxing
+HKR,, QCDeviceMuxEnable, 0x00010001, 0x00000001
+
+; Start Interface
+HKR,, QCDeviceStartIf, 0x00010001, 0x00000004
+
+; Number of Interfaces
+HKR,, QCDeviceNumIf, 0x00010001, 0x00000001
+
+; Number of Mux Interfaces
+HKR,, QCDeviceNumMuxIf, 0x00010001, 0x00000007
+
+[qcfilter.NT.Copy]
+qcusbfilter.sys
+
+[qcfilter2.NT.Copy]
+qcusbfilter.sys
+
+[qcfilter3.NT.Copy]
+qcusbfilter.sys
+
+[qcfilter4.NT.Copy]
+qcusbfilter.sys
+
+[DestinationDirs]
+qcfilter.NT.Copy = 12
+qcfilter2.NT.Copy = 12
+qcfilter3.NT.Copy = 12
+qcfilter4.NT.Copy = 12
+
+[qcfilter.NT.HW]
+AddReg = LowerFilterAddReg
+
+[qcfilter2.NT.HW]
+AddReg = LowerFilterAddReg
+
+[qcfilter3.NT.HW]
+AddReg = LowerFilterAddReg
+
+[qcfilter4.NT.HW]
+AddReg = LowerFilterAddReg
+
+[LowerFilterAddReg]
+HKR,,"LowerFilters",0x00010000,"qcfilter"
+
+;-----------------------------------------------------------------
+; Filter Device Filter Service Section
+;-----------------------------------------------------------------
+[qcfilter.NT.Services]
+Include    = USB.inf
+Needs      = Composite.Dev.NT.Services
+AddService = qcfilter,, filter_Service_Inst 
+
+
+
+[filter_Service_Inst]
+DisplayName    = %qcfilter.SvcDesc%                            
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\qcusbfilter.sys                            
+
+[Strings]
+QUECTEL                     = "Quectel Incorporated"
+QcomSrcDisk                 = "USB Driver Disk"
+
+qcfilter.DeviceDesc_HighSpeed = "Quectel USB Composite Device"
+;AG35
+qcfilter.DeviceDesc_GW    = "Quectel USB Composite Device"
+;AG35
+qcfilter.DeviceDesc0435     = "Quectel USB Composite Device"
+;BG96
+qcfilter.DeviceDesc0296     = "Quectel USB Composite Device"
+;EC21 EC25 EC20 R2.0
+qcfilter.DeviceDesc0125     = "Quectel USB Composite Device"
+qcfilter.DeviceDesc0121     = "Quectel USB Composite Device"
+;EP06 EM06 EG06
+qcfilter.DeviceDesc0306     = "Quectel USB Composite Device"
+;EG91 EG95
+qcfilter.DeviceDesc0191     = "Quectel USB Composite Device"
+qcfilter.DeviceDesc0195     = "Quectel USB Composite Device"
+;SDx20
+qcfilter.DeviceDesc0512     = "Quectel USB Composite Device"
+;AG15
+qcfilter.DeviceDesc0415  	= "Quectel USB Composite Device"
+
+qcfilter.SvcDesc            = "USB Composite Device Filter Driver"

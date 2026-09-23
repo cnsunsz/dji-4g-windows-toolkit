@@ -1,0 +1,274 @@
+;-------------------------------------------------------------------------------
+; QCWWAN.INF
+;
+; Quectel Wireless Network Device for Windows 7
+;
+; Copyright (c) 2014 Quectel Technologies, Inc.
+; All rights reserved.
+
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = Net
+ClassGUID   = {4d36e972-e325-11ce-bfc1-08002be10318}
+Provider    = %QCOM%
+DriverVer = 03/02/2023,20.0.72.5
+Catalogfile = qcwwan.cat
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[Manufacturer]
+%QCOM% = QCOM, NTx86.6.1, NTamd64.6.1
+
+[SourceDisksNames.x86]
+1000 = %QcomSrcDisk%,"",,\ndis\6.2\i386
+
+[SourceDisksNames.amd64]
+1001 = %QcomSrcDisk%,"",,\ndis\6.2\amd64
+
+[SourceDisksFiles.x86]
+  qcusbwwan.sys = 1000
+
+[SourceDisksFiles.amd64]
+  qcusbwwan.sys = 1001
+  
+
+[QCOM.NTx86.6.1]
+;add-2021-0317
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2CA3&PID_4006&MI_04
+
+;add-2021-0317
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030B&MI_04
+
+;AG35
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0435&MI_04
+;BG96
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0296&MI_04
+;EC21 EC25 EC20 R2.0
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0125&MI_04
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0121&MI_04
+;EP06 EM06 EG06
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0306&MI_04
+;EG91 EG95
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0191&MI_04
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0195&MI_04
+;Sdx20 EG12/EM12/EP12:
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0512&MI_04
+;AG15
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0415&MI_04
+;EG61-NA
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0161&MI_04
+;Sdx24
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0620&MI_04
+;RG500Q
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0800&MI_04
+;AG520
+;%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0452&MI_04
+;BG95
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0700&MI_03
+;AG550Q
+;%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0455&MI_04
+
+; EM05G
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030A&MI_06
+
+;RM520N-GL
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0801&MI_04
+
+;SDX7X
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0122&MI_04
+
+; EM05CN
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0310&MI_06
+
+;EM05G 标准项目
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030E&MI_04
+
+;EM061
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6008&MI_00
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6009&MI_00
+
+;EM162RGL
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6020&MI_04
+
+[QCOM.NTamd64.6.1]
+
+;add-2021-0317
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030B&MI_04
+;add-2021-0317
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2CA3&PID_4006&MI_04
+;AG35
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0435&MI_04
+;BG96
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0296&MI_04
+;EC21 EC25 EC20 R2.0
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0125&MI_04
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0121&MI_04
+;EP06 EM06 EG06
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0306&MI_04
+;EG91 EG95
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0191&MI_04
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0195&MI_04
+;Sdx20 EG12/EM12/EP12:
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0512&MI_04
+;AG15
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0415&MI_04
+;EG61-NA
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0161&MI_04
+;Sdx24
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0620&MI_04
+;RG500Q
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0800&MI_04
+;AG520
+;%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0452&MI_04
+;BG95
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0700&MI_03
+;AG550Q
+;%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0455&MI_04
+
+
+; EM05G
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030A&MI_06
+
+;RM520N-GL
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0801&MI_04
+
+;SDX7X
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0122&MI_04
+
+; EM05CN
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_0310&MI_06
+
+;EM05G 标准项目
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_030E&MI_04
+
+;EM061
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6008&MI_04
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6009&MI_04
+
+;EM061
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6008&MI_00
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6009&MI_00
+
+;EM162RGL
+%Quectel_NDIS_Adapter% = qcwwan.ndi, USB\VID_2C7C&PID_6020&MI_04
+
+[qcwwan.ndi]
+Characteristics = 0x4 ; NCF_PHYSICAL
+BusType         = 15  ; PNPBus
+
+; Windows 7 specific
+*IfType = 243 ; IF_TYPE_WWANPP
+*MediaType = 9 ; NdisMediumWirelessWan
+*PhysicalMediaType = 8 ; NdisPhysicalMediumWirelessWan
+EnableDhcp = 0
+
+AddReg          = qcwwan.Reg
+CopyFiles       = qcwwan.CopyFiles
+
+[qcwwan.ndi.Services]
+AddService      = qcusbwwan, 2, qcwwan.Service, qcwwan.EventLog
+
+;-----------------------------------------------------------------------------
+; WMI security settings
+;-----------------------------------------------------------------------------
+[gobiwwan.ndi.WMI]
+WMIInterface={DE81837E-BD78-4EC8-ABA8-89B7D026C1CF},,WMIGuidSecurity_AllReadAdminFul
+
+[WMIGuidSecurity_AllReadAdminFul]
+security="O:BAG:BAD:(A;;0x12001f;;;BA)(A;;0x12001f;;;LS)(A;;0x12001f;;;NS)(A;;0x12001f;;;SY)(A;;0x12001f;;;NO)(A;;CC;;;BU)"
+
+;-----------------------------------------------------------------------------
+; Virtual Miniport Common
+;
+[qcwwan.Reg]
+HKR,    ,                         BusNumber,           0, "0" 
+HKR, Ndi,                         Service,             0, "qcusbwwan"
+
+;Entries to be put in add-registry-section for NdisMediumWirelessWan
+HKR, Ndi\Interfaces, UpperRange, 0, "flpp4, flpp6"
+HKR, Ndi\Interfaces, LowerRange, 0, "ppip"
+HKR,, QCDevDisableQoS, 0x00010001, 0x00000003
+
+; Disable QMAP V4
+HKR,, QCMPEnableQMAPV4, 0x00010001, 0x00000000
+
+; Disable QMAP V3
+HKR,, QCMPEnableQMAPV3, 0x00010001, 0x00000000
+
+; Disable QMAP V2
+HKR,, QCMPEnableQMAPV2, 0x00010001, 0x00000000
+
+; Disable QMAP V1
+; HKR,, QCMPEnableQMAPV1, 0x00010001, 0x00000000
+
+; Disable QCNCM UL
+; HKR,, QCMPEnableMBIMUL, 0x00010001, 0x00000000
+
+; Disable QCNCM DL
+; HKR,, QCMPEnableMBIMDL, 0x00010001, 0x00000000
+
+; Disable TLP UL
+; HKR,, QCMPEnableTLP, 0x00010001, 0x00000000
+
+; Disable TLP DL
+; HKR,, QCMPEnableDLTLP, 0x00010001, 0x00000000
+
+; Max UL aggregated packets
+; HKR,, QCDriverTLPMaxPackets, 0x00010001, 0x00000003
+
+; Max DL aggregated packets
+HKR,, QCDriverDLMaxPackets, 0x00010001, 0x00000020
+
+; Max DL aggregated Size
+HKR,, QCDriverDLAggregationSize, 0x00010001, 0x00008000
+;-----------------------------------------------------------------------------
+; Driver and Service Section
+;
+[qcwwan.CopyFiles]
+qcusbwwan.sys,,,2
+
+[qcwwan.Service]
+DisplayName     = %qcwwan.Service.DispName%
+ServiceType     = 1 ;%SERVICE_KERNEL_DRIVER%
+StartType       = 3 ;%SERVICE_DEMAND_START%
+ErrorControl    = 1 ;%SERVICE_ERROR_NORMAL%
+ServiceBinary   = %12%\qcusbwwan.sys
+LoadOrderGroup  = NDIS
+AddReg          = TextModeFlags.Reg
+
+[qcwwan.EventLog]
+AddReg = qcwwan.AddEventLog.Reg
+
+[qcwwan.AddEventLog.Reg]
+HKR, , EventMessageFile, 0x00020000, "%%SystemRoot%%\System32\netevent.dll"
+HKR, , TypesSupported,   0x00010001, 7
+
+[TextModeFlags.Reg]
+HKR, , TextModeFlags,    0x00010001, 0x0001
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+qcusbwwan.sys  = 1,,
+
+;-----------------------------------------------------------------------------
+; DestinationDirs
+;
+[DestinationDirs]
+qcwwan.CopyFiles = 12
+
+;-----------------------------------------------------------------------------
+; Localizable Strings
+;
+[Strings]
+QcomSrcDisk = "Quectel USB Driver Disk"
+QCOM                       = "Quectel"  
+
+Quectel_NDIS_Adapter = "Quectel Wireless Ethernet Adapter"
+
+DiskId1 = "USB-NDIS Miniport Device Installation Disk #1"
+
+qcwwan.Service.DispName = "Quectel Wireless Ethernet Adapter"

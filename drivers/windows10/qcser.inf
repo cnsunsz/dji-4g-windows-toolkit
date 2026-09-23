@@ -1,0 +1,440 @@
+; Windows Virtual Serial Port Setup File
+; Manufacturer: Quectel Incorporated
+; Copyright (c) 2015 Quectel Technologies, Inc.
+; All rights reserved.
+; 
+
+
+
+[Version]
+signature  = "$WINDOWS NT$"
+Class      = Ports
+Provider   = %QUECTEL%
+ClassGuid  = {4D36E978-E325-11CE-BFC1-08002BE10318}
+DriverVer = 03/02/2023,30.0.72.6
+Catalogfile= qcser.cat
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[Manufacturer]
+%QUECTEL% = QcomSerialPort, NTx86, NTamd64
+
+[SourceDisksNames.x86]
+1000 = %QcomSrcDisk%,"",,\serial\i386
+
+[SourceDisksNames.amd64]
+1001 = %QcomSrcDisk%,"",,\serial\amd64
+
+[SourceDisksFiles.x86]
+  qcusbser.sys = 1000
+  
+[SourceDisksFiles.amd64]
+  qcusbser.sys = 1001
+
+[QcomSerialPort.NTx86]
+;GW
+%Quectel_GW00% = QportInstall00, USB\VID_3763&PID_3C93&MI_00
+%Quectel_GW01% = QportInstall00, USB\VID_3763&PID_3C93&MI_01
+
+;AG35
+%Quectel04350% = QportInstall00, USB\VID_2C7C&PID_0435&MI_00
+%Quectel04351% = QportInstall00, USB\VID_2C7C&PID_0435&MI_01
+%Quectel04352% = QportInstall00, USB\VID_2C7C&PID_0435&MI_02
+;BG96
+%Quectel02961% = QportInstall00, USB\VID_2C7C&PID_0296&MI_00
+%Quectel02962% = QportInstall00, USB\VID_2C7C&PID_0296&MI_01
+%Quectel02963% = QportInstall00, USB\VID_2C7C&PID_0296&MI_02
+;BG96 定制 CalAmp
+%Quectel02010% = QportInstall00, USB\VID_2C7C&PID_0201
+
+;add-2021-0317
+%Quectel01251% = QportInstall00, USB\VID_2CA3&PID_4006&MI_00
+%Quectel01252% = QportInstall00, USB\VID_2CA3&PID_4006&MI_01
+%Quectel01253% = QportInstall00, USB\VID_2CA3&PID_4006&MI_02
+
+;EC21 EC25 EC20 R2.0
+%Quectel01251% = QportInstall00, USB\VID_2C7C&PID_0125&MI_00
+%Quectel01252% = QportInstall00, USB\VID_2C7C&PID_0125&MI_01
+%Quectel01253% = QportInstall00, USB\VID_2C7C&PID_0125&MI_02
+%Quectel01211% = QportInstall00, USB\VID_2C7C&PID_0121&MI_00
+%Quectel01212% = QportInstall00, USB\VID_2C7C&PID_0121&MI_01
+%Quectel01213% = QportInstall00, USB\VID_2C7C&PID_0121&MI_02
+;EP06 EM06 EG06
+%Quectel03061% = QportInstall00, USB\VID_2C7C&PID_0306&MI_00
+%Quectel03062% = QportInstall00, USB\VID_2C7C&PID_0306&MI_01
+%Quectel03063% = QportInstall00, USB\VID_2C7C&PID_0306&MI_02
+;EG91 EG95
+%Quectel01911% = QportInstall00, USB\VID_2C7C&PID_0191&MI_00
+%Quectel01912% = QportInstall00, USB\VID_2C7C&PID_0191&MI_01
+%Quectel01913% = QportInstall00, USB\VID_2C7C&PID_0191&MI_02
+%Quectel01951% = QportInstall00, USB\VID_2C7C&PID_0195&MI_00
+%Quectel01952% = QportInstall00, USB\VID_2C7C&PID_0195&MI_01
+%Quectel01953% = QportInstall00, USB\VID_2C7C&PID_0195&MI_02
+
+;Sdx20
+%Quectel05120% = QportInstall00, USB\VID_2C7C&PID_0512&MI_00
+%Quectel05121% = QportInstall00, USB\VID_2C7C&PID_0512&MI_01
+%Quectel05122% = QportInstall00, USB\VID_2C7C&PID_0512&MI_02
+;AG15
+%Quectel04150% = QportInstall00, USB\VID_2C7C&PID_0415&MI_00
+%Quectel04151% = QportInstall00, USB\VID_2C7C&PID_0415&MI_01
+%Quectel04152% = QportInstall00, USB\VID_2C7C&PID_0415&MI_02
+
+;EG61
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0161&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0161&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0161&MI_02
+
+;Sdx24
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0620&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0620&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0620&MI_02
+;Sdx12
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_030B&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_030B&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_030B&MI_02
+
+;RG500Q
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0800&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0800&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0800&MI_02
+;AG520
+;%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0452&MI_00
+;%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0452&MI_01
+;%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0452&MI_02
+;BG95
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0700&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0700&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0700&MI_04
+
+;Qualcomm 9008
+%Quectel90080% = QportInstall00, USB\VID_05C6&PID_9008
+
+;AG550Q
+;%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0455&MI_00
+;%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0455&MI_01
+;%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0455&MI_02
+
+; AG215S pid_0456 windows only dm
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0456
+
+%Quectel030A_AT% = QportInstall00, USB\VID_2C7C&PID_030A&MI_02
+%Quectel030A_DM% = QportInstall00, USB\VID_2C7C&PID_030A&MI_03
+%Quectel030A_NEMA% = QportInstall00, USB\VID_2C7C&PID_030A&MI_04
+%Quectel030A_AT2% = QportInstall00, USB\VID_2C7C&PID_030A&MI_05
+
+;RM520N-GL
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0801&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0801&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0801&MI_02
+
+;SDX7X
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0122&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0122&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0122&MI_02
+
+;EM05CN
+%Quectel_AT_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_00
+%Quectel_DM_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_04
+
+;EM05G 标准项目
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_030E&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_030E&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_030E&MI_02
+
+;EM061
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6008&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6008&MI_04
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6008&MI_05
+
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6009&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6009&MI_04
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6009&MI_05
+
+;EM162RGL
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6020&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6020&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6020&MI_02
+
+[QcomSerialPort.NTamd64]
+;GW
+%Quectel_GW00% = QportInstall00, USB\VID_3763&PID_3C93&MI_00
+%Quectel_GW01% = QportInstall00, USB\VID_3763&PID_3C93&MI_01
+
+;add-2021-0317
+%Quectel01251% = QportInstall00, USB\VID_2CA3&PID_4006&MI_00
+%Quectel01252% = QportInstall00, USB\VID_2CA3&PID_4006&MI_01
+%Quectel01253% = QportInstall00, USB\VID_2CA3&PID_4006&MI_02
+
+;AG35
+%Quectel04350% = QportInstall00, USB\VID_2C7C&PID_0435&MI_00
+%Quectel04351% = QportInstall00, USB\VID_2C7C&PID_0435&MI_01
+%Quectel04352% = QportInstall00, USB\VID_2C7C&PID_0435&MI_02
+;for BG96
+%Quectel02961% = QportInstall00, USB\VID_2C7C&PID_0296&MI_00
+%Quectel02962% = QportInstall00, USB\VID_2C7C&PID_0296&MI_01
+%Quectel02963% = QportInstall00, USB\VID_2C7C&PID_0296&MI_02
+;BG96 定制 CalAmp
+%Quectel02010% = QportInstall00, USB\VID_2C7C&PID_0201
+
+;EP06 EM06 EG06
+%Quectel03061% = QportInstall00, USB\VID_2C7C&PID_0306&MI_00
+%Quectel03062% = QportInstall00, USB\VID_2C7C&PID_0306&MI_01
+%Quectel03063% = QportInstall00, USB\VID_2C7C&PID_0306&MI_02
+;EC21 EC25 EC20 R2.0
+%Quectel01251% = QportInstall00, USB\VID_2C7C&PID_0125&MI_00
+%Quectel01252% = QportInstall00, USB\VID_2C7C&PID_0125&MI_01
+%Quectel01253% = QportInstall00, USB\VID_2C7C&PID_0125&MI_02
+%Quectel01211% = QportInstall00, USB\VID_2C7C&PID_0121&MI_00
+%Quectel01212% = QportInstall00, USB\VID_2C7C&PID_0121&MI_01
+%Quectel01213% = QportInstall00, USB\VID_2C7C&PID_0121&MI_02
+;EG91 EG95
+%Quectel01911% = QportInstall00, USB\VID_2C7C&PID_0191&MI_00
+%Quectel01912% = QportInstall00, USB\VID_2C7C&PID_0191&MI_01
+%Quectel01913% = QportInstall00, USB\VID_2C7C&PID_0191&MI_02
+%Quectel01951% = QportInstall00, USB\VID_2C7C&PID_0195&MI_00
+%Quectel01952% = QportInstall00, USB\VID_2C7C&PID_0195&MI_01
+%Quectel01953% = QportInstall00, USB\VID_2C7C&PID_0195&MI_02
+;Sdx20
+%Quectel05120% = QportInstall00, USB\VID_2C7C&PID_0512&MI_00
+%Quectel05121% = QportInstall00, USB\VID_2C7C&PID_0512&MI_01
+%Quectel05122% = QportInstall00, USB\VID_2C7C&PID_0512&MI_02
+;AG15
+%Quectel04150% = QportInstall00, USB\VID_2C7C&PID_0415&MI_00
+%Quectel04151% = QportInstall00, USB\VID_2C7C&PID_0415&MI_01
+%Quectel04152% = QportInstall00, USB\VID_2C7C&PID_0415&MI_02
+;EG61
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0161&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0161&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0161&MI_02
+;Sdx24
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0620&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0620&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0620&MI_02
+;RG500Q
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0800&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0800&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0800&MI_02
+;AG520
+;%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0452&MI_00
+;%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0452&MI_01
+;%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0452&MI_02
+;BG95
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0700&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0700&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0700&MI_04
+
+;Qualcomm 9008
+%Quectel90080% = QportInstall00, USB\VID_05C6&PID_9008
+
+;Sdx12
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_030B&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_030B&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_030B&MI_02
+
+;AG550Q
+;%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0455&MI_00
+;%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0455&MI_01
+;%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0455&MI_02
+
+; AG215S pid_0456 windows only dm
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0456
+
+%Quectel030A_AT% = QportInstall00, USB\VID_2C7C&PID_030A&MI_02
+%Quectel030A_DM% = QportInstall00, USB\VID_2C7C&PID_030A&MI_03
+%Quectel030A_NEMA% = QportInstall00, USB\VID_2C7C&PID_030A&MI_04
+%Quectel030A_AT2% = QportInstall00, USB\VID_2C7C&PID_030A&MI_05
+
+;;RM520N-GL
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0801&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0801&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0801&MI_02
+
+;SDX7X
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_0122&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0122&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_0122&MI_02
+
+;EM05CN
+%Quectel_AT_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_00
+%Quectel_DM_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_0310&MI_04
+
+;EM05G 标准项目
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_030E&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_030E&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_030E&MI_02
+
+;EM061
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6008&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6008&MI_04
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6008&MI_05
+
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6009&MI_03
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6009&MI_04
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6009&MI_05
+
+;EM162RGL
+%Quectel_DM_Port%   = QportInstall00, USB\VID_2C7C&PID_6020&MI_00
+%Quectel_NMEA_Port% = QportInstall00, USB\VID_2C7C&PID_6020&MI_01
+%Quectel_AT_Port%   = QportInstall00, USB\VID_2C7C&PID_6020&MI_02
+
+
+[QportInstall00.NT]
+CopyFiles=QCUsbDriverFiles
+AddReg = All00, AddReg
+
+[QportInstall01.NT]
+CopyFiles=QCUsbDriverFiles
+AddReg = All00, AddReg, DevFunction1
+
+[QportInstall02.NT]
+CopyFiles=QCUsbDriverFiles
+AddReg = All00, AddReg, DevFunction2
+
+[QportInstall05.NT]
+CopyFiles=QCUsbDriverFiles
+AddReg = All00, AddReg
+
+[QCUsbDriverFiles]
+qcusbser.sys
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[QportInstall00.NT.Services]
+AddService=qcusbser,  0x00000002, QC_USBSerialService
+
+[QportInstall01.NT.Services]
+AddService=qcusbser,  0x00000002, QC_USBSerialService
+
+[QportInstall02.NT.Services]
+AddService=qcusbser,  0x00000002, QC_USBSerialService
+
+[QportInstall05.NT.Services]
+AddService=qcusbser,  0x00000002, QC_USBSerialService05
+
+[QC_USBSerialService]
+DisplayName   = %QCUSBSER%
+ServiceType   = 1
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %12%\qcusbser.sys
+;AddReg        = RegEntries
+
+[QC_USBSerialService05]
+DisplayName   = %QCUSBSER%
+ServiceType   = 1
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %12%\qcusbser.sys
+;AddReg        = RegEntries
+
+[All00]
+HKR,,NTMPDriver,,qcusbser.sys
+
+[DevFunction1]
+HKR,,QCDeviceFunction,0x00010001,1
+
+[DevFunction2]
+HKR,,QCDeviceFunction,0x00010001,2
+
+[RegEntries]
+HKR, , QCDriverSelectiveSuspendIdleTime, 0x00010001, 0x80000010
+HKR, , QCDriverPowerManagementEnabled, 0x00010001, 1
+
+
+[AddReg]
+HKR,,PortSubClass,1,01
+HKR,,EnumPropPages32,,"MsPorts.dll,SerialPortPropPageProvider"
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69025,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69026,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69031,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69032,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69037,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69038,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum05C69008,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0125,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0121,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0435,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0306,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0296,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0191,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0195,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0512,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum37633C93,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0415,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0161,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0620,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0700,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0800,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0452,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0201,1,1 
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0455,1,1  
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0456,1,1 
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C030B,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C030A,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0801,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C0310,1,1
+HKLM,SYSTEM\CurrentControlSet\Control\UsbFlags,IgnoreHWSerNum2C7C030E,1,1
+
+[Strings]
+QCUSBSER = "Quectel USB Device for Legacy Serial Communication"
+QcomSrcDisk = "QUECTEL USB Driver Disk"
+QUECTEL   = "Quectel Incorporated"
+
+Quectel_DM_Port = "Quectel USB DM Port"
+Quectel_NMEA_Port = "Quectel USB NMEA Port"
+Quectel_AT_Port = "Quectel USB AT Port"
+;Quectel_AT2_Port = "Quectel USB AT2 Port"
+Quectel_DIAG_Port = "Quectel USB DIAG Port"
+
+;GW
+Quectel_GW00 = "Quectel USB DM Port"
+Quectel_GW01 = "Quectel USB AT Port"
+
+;AG35
+Quectel04350 = "Quectel USB DM Port"
+Quectel04351 = "Quectel USB NMEA Port"
+Quectel04352 = "Quectel USB AT Port"
+;BG96
+Quectel02961 = "Quectel USB DM Port"
+Quectel02962 = "Quectel USB NMEA Port"
+Quectel02963 = "Quectel USB AT Port"
+;EC21 EC25 EC20 R2.0
+Quectel01251 = "Quectel USB DM Port"
+Quectel01252 = "Quectel USB NMEA Port"
+Quectel01253 = "Quectel USB AT Port"
+Quectel01211 = "Quectel USB DM Port"
+Quectel01212 = "Quectel USB NMEA Port"
+Quectel01213 = "Quectel USB AT Port"
+Quectel90080 = "Quectel QDLoader 9008"
+;EP06 EM06 EG06
+Quectel03061 = "Quectel USB DM Port"
+Quectel03062 = "Quectel USB NMEA Port"
+Quectel03063 = "Quectel USB AT Port"
+;EG91 EG95
+Quectel01911 = "Quectel USB DM Port"
+Quectel01912 = "Quectel USB NMEA Port"
+Quectel01913 = "Quectel USB AT Port"
+Quectel01951 = "Quectel USB DM Port"
+Quectel01952 = "Quectel USB NMEA Port"
+Quectel01953 = "Quectel USB AT Port"
+;Sdx20
+Quectel05120 = "Quectel USB DM Port"
+Quectel05121 = "Quectel USB NMEA Port"
+Quectel05122 = "Quectel USB AT Port"
+;AG15
+Quectel04150 = "Quectel USB DM Port"
+Quectel04151 = "Quectel USB NMEA Port"
+Quectel04152 = "Quectel USB AT Port"
+
+;BG96 定制 CalAmp
+Quectel02010 = "Quectel USB SER3 Port"
+
+Quectel030A_DM = "Quectel USB DM Port"
+Quectel030A_NEMA = "Quectel USB NMEA Port"
+Quectel030A_AT = "Quectel USB AT Port"
+Quectel030A_AT2 = "Quectel USB AT2 Port"

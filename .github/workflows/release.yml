@@ -1,0 +1,113 @@
+# Build Windows onefile EXE on windows-latest and publish GitHub Release assets.
+# Trigger: push tag v*  OR  workflow_dispatch (manual).
+name: Build & Release Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to create/upload (e.g. v0.1.0). Leave empty to build artifact only."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Verify bundled drivers
+        shell: pwsh
+        run: |
+          $inf = "drivers/windows10/qcser.inf"
+          if (-not (Test-Path $inf)) { throw "Missing $inf — drivers must be committed" }
+          Get-ChildItem drivers/windows10 -Filter *.inf | ForEach-Object { $_.FullName }
+
+      - name: PyInstaller onefile GUI
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --name "DJI-4G-Windows-Toolkit" `
+            --paths "." `
+            --add-data "drivers/windows10;drivers/windows10" `
+            --add-data "scripts/Install-Drivers.ps1;scripts" `
+            --hidden-import "app" `
+            --hidden-import "app.device" `
+            --hidden-import "app.driver_install" `
+            --hidden-import "app.sms_server" `
+            --hidden-import "serial" `
+            --hidden-import "serial.tools.list_ports" `
+            --hidden-import "flask" `
+            --collect-all flask `
+            "app/main.py"
+
+      - name: Hash EXE
+        shell: pwsh
+        run: |
+          $exe = "dist/DJI-4G-Windows-Toolkit.exe"
+          if (-not (Test-Path $exe)) { throw "EXE missing" }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash
+          Set-Content -Path "dist/DJI-4G-Windows-Toolkit.exe.sha256" -Value "$hash  DJI-4G-Windows-Toolkit.exe" -NoNewline
+          Get-Item $exe | Format-List Name, Length
+          Get-Content "dist/DJI-4G-Windows-Toolkit.exe.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJI-4G-Windows-Toolkit
+          path: |
+            dist/DJI-4G-Windows-Toolkit.exe
+            dist/DJI-4G-Windows-Toolkit.exe.sha256
+          if-no-files-found: error
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "do_release=true" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ github.event.inputs.tag_name }}" ]]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "do_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "do_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release + upload EXE
+        if: steps.meta.outputs.do_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/DJI-4G-Windows-Toolkit.exe
+            dist/DJI-4G-Windows-Toolkit.exe.sha256
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
