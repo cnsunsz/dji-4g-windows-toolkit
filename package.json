@@ -36,7 +36,8 @@
       "electron/**/*",
       "src/**/*",
       "package.json",
-      "build/icon.png"
+      "build/icon.png",
+      "build/icon.ico"
     ],
     "extraResources": [
       {
@@ -63,7 +64,8 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -75,6 +77,6 @@
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
     "publish": null,
-    "icon": "build/icon.png"
+    "icon": "build/icon.ico"
   }
 }

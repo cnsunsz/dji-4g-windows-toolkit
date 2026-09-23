@@ -95,10 +95,19 @@ function gatherThreads() {
 }
 
 function iconPath() {
-  const candidates = [
-    path.join(__dirname, '..', 'build', 'icon.png'),
-    path.join(process.resourcesPath || '', 'build', 'icon.png'),
+  // Prefer Windows .ico, then PNG (dev tree and packaged resources)
+  const names = ['icon.ico', 'icon.png'];
+  const dirs = [
+    path.join(__dirname, '..', 'build'),
+    path.join(process.resourcesPath || '', 'build'),
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'build'),
   ];
+  const candidates = [];
+  for (const dir of dirs) {
+    for (const name of names) {
+      candidates.push(path.join(dir, name));
+    }
+  }
   for (const p of candidates) {
     try {
       const img = nativeImage.createFromPath(p);
