@@ -10,10 +10,10 @@
 
 ## 功能
 
-1. **Electron 桌面应用**：驱动安装 / 模块检测 / 短信收发全部在一个窗口内完成
+1. **Electron 桌面应用**：左侧导航（概览 / 短信 / 驱动 / 诊断）+ 浅色默认主题（可切换深色并持久化）
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS，管理员一键 `pnputil` 安装 `qcser` / `qcmdm` / `qcfilter`（默认**不**安装 `qcwwan`）
 3. **短信（PDU）**：`AT+CMGF=0` + `AT+CNMI=2,1,0,0,0`；`AT+CMGL=4` 遍历 SM/ME/MT；自研 MIT 清洁实现的 SMS-DELIVER PDU 解码（发件人 / 时间戳 / GSM7·UCS2，基础长短信拼接）；PDU `CMGS` 发送；监听 `+CMTI:` 刷新对应索引。**默认不自动删除**短信
-4. **状态面板**：本机号码（`AT+CNUM`）、ICCID、IMSI、CSCA、CREG/CEREG、运营商、CSQ、**IMS**（`AT+QCFG="ims"`）
+4. **概览状态板**：运营商、信号、网络、SIM/号码、IMS、端口、ICCID（缩短显示）、注册状态
 5. **启用 IMS**：一键 `AT+QCFG="ims",1`，可选两步软重启 `AT+CFUN=1,1`
 
 ### 漫游物联网卡 / 收信说明
@@ -30,8 +30,8 @@
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.3.0
-   git push origin v0.3.0
+   git tag v0.4.0
+   git push origin v0.4.0
    ```
 2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版，并创建 GitHub Release
 3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行
@@ -45,8 +45,8 @@
 1. 插入 DJI 第一代 4G 模块（或对应 USB 网卡）
 2. 运行 `DJI-4G-Windows-Toolkit`
 3. **驱动** → **一键安装驱动** → 同意 UAC
-4. **模块** → **检测模块**，确认出现 `Quectel USB AT Port`
-5. **短信** 区查看本机号码 / IMS / 信号，刷新收件箱，发送短信；需要时点「启用 IMS」或「启用 IMS 并软重启」
+4. **诊断** → **检测模块**，确认出现 `Quectel USB AT Port`
+5. **概览 / 短信** 查看本机号码 / IMS / 信号，刷新收件箱，发送短信；需要时在「诊断」启用 IMS 或软重启
 
 **注意**
 
@@ -90,7 +90,9 @@ npm run build
 ```
 electron/main.js      BrowserWindow + IPC
 electron/preload.js   contextBridge API
-src/index.html        单页 UI（驱动 / 模块 / 短信+IMS）
+src/index.html        控制台壳（侧栏 + 多视图）
+src/styles.css        自研浅/深色主题
+src/renderer.js       视图切换 / 状态板 / SMS UI
 src/device.js         端口 / PnP / ATI
 src/modem.js          AT 串口（PDU CMGF/CMGL/CMGS、CMTI、IMS）
 src/pdu.js            MIT 自研 SMS PDU 编解码
@@ -107,6 +109,7 @@ drivers/windows10/
 - Quectel 驱动二进制：专有，见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 早期文本模式短信思路参考 MIT 项目 [ctexcel-sms-dji](https://github.com/ywang3129-cell/ctexcel-sms-dji)
 - **v0.3 PDU / 状态 / IMS 流程**受 macOS 侧 DJI 4G 工具（如 **DJOneHub / DJ4Hub / DJIC**）常见 AT 用法启发；实现为对照 **3GPP AT/PDU 惯例**的清洁重写。**未复制** DJOneHub 的 PolyForm Noncommercial 源码
+- **v0.4 UI**：侧栏控制台 / 状态磁贴 / 浅深色主题在视觉上受 **VoHive**（`6mb/vohive` 等）与 **DJOneHub** mac 控制台启发；本仓库 `src/` 下 HTML/CSS/JS 为**原创 MIT 实现**，**不包含** PolyForm Noncommercial 源码。详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 
 所用技术（`CMGF=0`、`CMGL=4`、`CNMI`、`QCFG="ims"`、CNUM/CCID 等）均为公开调制解调器 AT 实践。
 
@@ -118,9 +121,10 @@ drivers/windows10/
 
 - Quectel USB driver install (AT/DM/filter; WWAN skipped by default)
 - In-window **PDU** SMS (list SM/ME/MT, decode Deliver, PDU submit, `+CMTI` listen; no auto-delete)
-- Status: MSISDN, ICCID, IMSI, CSCA, registration, CSQ, **IMS**; button to enable IMS (+ optional soft reboot)
+- Overview status tiles: operator, signal, network, SIM/MSISDN, IMS, port, ICCID, registration
+- IMS enable (+ optional soft reboot); light/dark theme with sidebar navigation (v0.4+)
 - Roaming IoT SIMs often need IMS registration before inbound SMS works
 
 **Release:** push `v*` tag → Actions builds on `windows-latest` → Release assets.
 
-Inspired by common AT/modem practice and prior art such as DJOneHub/DJIC (techniques only; **no PolyForm code copied**). Not affiliated with DJI or Quectel.
+UI *look-and-feel* inspired by VoHive / DJOneHub dashboards (**inspiration only**; **no PolyForm code copied**). Modem flows inspired by common AT practice and prior art such as DJOneHub/DJIC (techniques only). Not affiliated with DJI or Quectel.

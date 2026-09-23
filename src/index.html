@@ -1,60 +1,162 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DJI 4G Windows Toolkit</title>
+  <script>
+    try {
+      var t = localStorage.getItem('dji4g-toolkit-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
-    <header class="hdr">
-      <h1>DJI 4G Windows Toolkit <span id="ver" class="ver"></span></h1>
-      <p class="sub">DJI Cellular Gen1 / Baiwang QDC507（USB 2CA3:4006）· Quectel AT/SMS（PDU）· 统一窗口内完成驱动 / 检测 / 短信</p>
-    </header>
-
-    <section class="card" id="sec-driver">
-      <h2>驱动</h2>
-      <div class="row">
-        <button type="button" id="btnDrivers">一键安装驱动</button>
-        <span class="hint">安装 qcser / qcmdm / qcfilter（默认不装 qcwwan）· 需 UAC</span>
+  <div class="shell">
+    <aside class="rail" aria-label="主导航">
+      <div class="rail-brand">
+        <span class="rail-dot" aria-hidden="true"></span>
+        <div class="rail-brand-text">
+          <strong>DJI 4G Toolkit</strong>
+          <span>Windows · PDU</span>
+        </div>
       </div>
-      <pre id="driverLog" class="log" aria-live="polite">就绪。建议顺序：安装驱动 → 检测模块 → 使用短信。</pre>
-    </section>
-
-    <section class="card" id="sec-module">
-      <h2>模块</h2>
-      <div class="row">
-        <button type="button" id="btnDetect">检测模块</button>
+      <nav class="rail-nav" role="tablist">
+        <button type="button" class="rail-item is-active" data-view="overview" role="tab" aria-selected="true">
+          <span class="rail-ico" aria-hidden="true">◉</span>
+          <span class="rail-label">概览</span>
+        </button>
+        <button type="button" class="rail-item" data-view="sms" role="tab" aria-selected="false">
+          <span class="rail-ico" aria-hidden="true">✉</span>
+          <span class="rail-label">短信</span>
+        </button>
+        <button type="button" class="rail-item" data-view="drivers" role="tab" aria-selected="false">
+          <span class="rail-ico" aria-hidden="true">⚙</span>
+          <span class="rail-label">驱动</span>
+        </button>
+        <button type="button" class="rail-item" data-view="diag" role="tab" aria-selected="false">
+          <span class="rail-ico" aria-hidden="true">⌘</span>
+          <span class="rail-label">诊断</span>
+        </button>
+      </nav>
+      <div class="rail-foot">
+        <button type="button" id="btnTheme" class="theme-toggle" title="切换浅色/深色">浅色</button>
+        <span id="ver" class="ver-pill"></span>
       </div>
-      <pre id="moduleLog" class="log" aria-live="polite">点击「检测模块」查看 USB / AT 口 / ATI。</pre>
-    </section>
+    </aside>
 
-    <section class="card" id="sec-sms">
-      <h2>短信</h2>
-      <div class="row" style="margin-bottom:10px">
-        <button type="button" id="btnSmsRefresh">刷新状态 / 短信</button>
-        <button type="button" class="secondary" id="btnSmsReconnect">重新连接</button>
-        <button type="button" class="secondary" id="btnEnableIms">启用 IMS</button>
-        <button type="button" class="secondary" id="btnEnableImsReboot">启用 IMS 并软重启</button>
-      </div>
-      <div id="smsStatus" class="status">未连接</div>
-      <p class="hint warn-hint">发短信请发到本机显示的国际号码；漫游物联网卡常需 IMS 注册后才能收信。</p>
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">DJI CELLULAR GEN1 · QDC507</p>
+          <h1 id="pageTitle">模块概览</h1>
+          <p class="topbar-sub" id="pageSub">运营商 / 信号 / SIM / IMS 一览</p>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" class="btn ghost" id="btnSmsReconnect">重新连接</button>
+          <button type="button" class="btn ghost" id="btnSmsRefresh">刷新</button>
+        </div>
+      </header>
 
-      <div class="send-box">
-        <label for="smsTo">号码</label>
-        <input id="smsTo" placeholder="+86138...." autocomplete="off">
-        <label for="smsText">内容（PDU 发送；中文 UCS2，英文优先 GSM7）</label>
-        <textarea id="smsText" placeholder="短信内容"></textarea>
-        <button type="button" id="btnSend">发送</button>
-      </div>
+      <main class="content">
+        <!-- Overview -->
+        <section class="view is-active" id="view-overview" data-title="模块概览" data-sub="运营商 / 信号 / SIM / IMS 一览">
+          <p class="kicker">STATUS BOARD</p>
+          <div class="tile-grid" id="overviewTiles" aria-live="polite">
+            <article class="tile"><span class="tile-k">运营商</span><strong class="tile-v" data-field="operator">—</strong></article>
+            <article class="tile"><span class="tile-k">信号</span><strong class="tile-v" data-field="signal">—</strong></article>
+            <article class="tile"><span class="tile-k">网络</span><strong class="tile-v" data-field="network">—</strong></article>
+            <article class="tile"><span class="tile-k">SIM / 号码</span><strong class="tile-v" data-field="sim">—</strong></article>
+            <article class="tile"><span class="tile-k">IMS</span><strong class="tile-v" data-field="ims">—</strong></article>
+            <article class="tile"><span class="tile-k">端口</span><strong class="tile-v" data-field="port">—</strong></article>
+            <article class="tile"><span class="tile-k">ICCID</span><strong class="tile-v" data-field="iccid">—</strong></article>
+            <article class="tile"><span class="tile-k">注册状态</span><strong class="tile-v" data-field="reg">—</strong></article>
+          </div>
+          <div id="smsStatus" class="connect-banner" hidden></div>
+          <div class="hint-card">
+            <strong>提示</strong>
+            <p>漫游物联网卡（如英国 IoT）收信常需 IMS 已注册。发短信请发到本机显示的国际号码。连接时不会自动删除模组内短信。</p>
+          </div>
+        </section>
 
-      <h3 class="inbox-title">收件箱（PDU）</h3>
-      <p class="hint">PDU 模式列出 SM/ME/MT；监听 +CMTI 新信提示。连接时<strong>不会</strong>自动删除短信（除非你另做删除操作）。约每 15 秒自动刷新。</p>
-      <div id="smsList"></div>
-    </section>
-  </main>
+        <!-- SMS -->
+        <section class="view" id="view-sms" data-title="短信" data-sub="PDU 收发 · SM / ME / MT · +CMTI 监听">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">COMPOSE</p>
+                <h2>发送短信</h2>
+              </div>
+            </div>
+            <div class="compose-row">
+              <input id="smsTo" type="tel" placeholder="接收号码，如 +86138…" autocomplete="off">
+              <input id="smsText" type="text" placeholder="短信内容（中文 UCS2，英文优先 GSM7）" autocomplete="off">
+              <button type="button" class="btn primary" id="btnSend">发送</button>
+            </div>
+          </div>
+
+          <div class="panel inbox-panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">INBOX</p>
+                <h2>收件箱（PDU）</h2>
+              </div>
+              <p class="panel-note">约每 15 秒自动刷新；列表为空多为网络/IMS/SIM 未投递</p>
+            </div>
+            <div id="smsList" class="inbox" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- Drivers -->
+        <section class="view" id="view-drivers" data-title="驱动" data-sub="Quectel qcser / qcmdm / qcfilter · 需 UAC">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">WINDOWS DRIVERS</p>
+                <h2>一键安装</h2>
+              </div>
+              <button type="button" class="btn primary" id="btnDrivers">一键安装驱动</button>
+            </div>
+            <p class="muted-line">安装 qcser / qcmdm / qcfilter（默认不装 qcwwan）。建议顺序：安装驱动 → 检测模块 → 使用短信。</p>
+            <pre id="driverLog" class="console" aria-live="polite">就绪。点击上方按钮开始安装。</pre>
+          </div>
+        </section>
+
+        <!-- Diagnostics -->
+        <section class="view" id="view-diag" data-title="诊断" data-sub="USB / AT 口 / ATI · IMS 启用">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">MODULE PROBE</p>
+                <h2>检测模块</h2>
+              </div>
+              <button type="button" class="btn primary" id="btnDetect">检测模块</button>
+            </div>
+            <pre id="moduleLog" class="console" aria-live="polite">点击「检测模块」查看 USB / AT 口 / ATI。</pre>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker">IMS</p>
+                <h2>语音/短信域注册</h2>
+              </div>
+              <div class="btn-row">
+                <button type="button" class="btn ghost" id="btnEnableIms">启用 IMS</button>
+                <button type="button" class="btn warn" id="btnEnableImsReboot">启用 IMS 并软重启</button>
+              </div>
+            </div>
+            <div class="hint-card warn">
+              <strong>英国等 IoT 号码</strong>
+              <p>在中国漫游时，收信常依赖 IMS 注册成功（目标 <code>IMS=1,1</code>）。「启用并软重启」会执行 <code>AT+QCFG="ims",1</code> 后 <code>AT+CFUN=1,1</code>，USB 会短暂断开，需再点「重新连接」。</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -37,6 +37,26 @@ DJI 4G tools such as DJOneHub / DJ4Hub / DJIC are acknowledged as **prior art
 inspiration only**. Their PolyForm Noncommercial (or other non-MIT) source was
 **not** copied; PDU codecs and modem control here are original MIT code.
 
+## UI layout inspiration (v0.4+)
+
+The Electron renderer shell (left rail navigation, status tile board, light/dark
+theme, SMS compose + inbox layout) was **visually inspired** by product consoles
+such as:
+
+- **VoHive** (`6mb/vohive`, `iniwex5/vohive`) — Copyright of the respective VoHive
+  authors; licensed under **PolyForm Noncommercial**. Used as layout/UX *inspiration
+  only*. This toolkit does **not** ship, vend, or derivative-copy VoHive Vue/HTML/CSS/JS.
+- **DJOneHub** (macOS console) — likewise PolyForm Noncommercial; acknowledged as
+  dashboard *prior art inspiration only*. No DJOneHub source was copied into this MIT
+  tree.
+
+Required notice (inspiration credit only — we do **not** redistribute their code):
+
+> Copyright (c) VoHive contributors / DJOneHub authors. Their PolyForm Noncommercial
+> works are separate projects. Mentions here are descriptive prior-art credits for
+> UI *look-and-feel inspiration*. All HTML/CSS/JS in `src/` of this repository is
+> original MIT work by cnsunsz.
+
 ## Electron / Node dependencies
 
 - Electron — see Electron / Chromium / Node license notices shipped by Electron

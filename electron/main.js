@@ -13,12 +13,12 @@ const modem = new AtModem();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 920,
-    height: 860,
-    minWidth: 720,
-    minHeight: 560,
+    width: 1100,
+    height: 720,
+    minWidth: 860,
+    minHeight: 600,
     title: `DJI 4G Windows Toolkit  v${APP_VERSION}`,
-    backgroundColor: '#0f1419',
+    backgroundColor: '#f9fafb',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
