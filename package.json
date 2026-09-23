@@ -1,7 +1,7 @@
 {
   "name": "dji-4g-windows-toolkit",
-  "version": "0.2.0",
-  "description": "DJI 4G Windows Toolkit \u2014 Electron app for Quectel driver install and SMS via USB AT port",
+  "version": "0.3.0",
+  "description": "DJI 4G Windows Toolkit — Electron app for Quectel driver install and PDU SMS via USB AT port",
   "main": "electron/main.js",
   "author": "cnsunsz",
   "license": "MIT",
@@ -25,7 +25,7 @@
   "build": {
     "appId": "com.cnsunsz.dji4gtoolkit",
     "productName": "DJI-4G-Windows-Toolkit",
-    "copyright": "Copyright \u00a9 2026 cnsunsz",
+    "copyright": "Copyright © 2026 cnsunsz",
     "directories": {
       "output": "dist",
       "buildResources": "build"

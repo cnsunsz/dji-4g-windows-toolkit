@@ -14,7 +14,7 @@ const modem = new AtModem();
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 920,
-    height: 780,
+    height: 860,
     minWidth: 720,
     minHeight: 560,
     title: `DJI 4G Windows Toolkit  v${APP_VERSION}`,
@@ -34,6 +34,16 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+function broadcastUrc(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('sms:urc', payload);
+  }
+}
+
+modem.setUrcHandler((payload) => {
+  broadcastUrc(payload);
+});
 
 app.whenReady().then(() => {
   createWindow();
@@ -72,5 +82,14 @@ ipcMain.handle('sms:send', async (_evt, payload) => {
     return { ok: true };
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('sms:enableIms', async (_evt, payload) => {
+  try {
+    const result = await modem.enableIms({ reboot: !!(payload && payload.reboot) });
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, error: String(err.message || err), status: modem.status(), messages: modem.messages() };
   }
 });

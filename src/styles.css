@@ -115,7 +115,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   word-break: break-word;
   font-size: 0.86rem;
   line-height: 1.45;
-  max-height: 220px;
+  max-height: 320px;
   overflow: auto;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
@@ -147,3 +147,21 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.warn-hint {
+  margin: 10px 0 0;
+  color: #f0c674;
+  line-height: 1.4;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.status-grid .k { color: var(--muted); }
+.status-grid .v { color: var(--text); word-break: break-all; }
+
+button.danger { background: #a65d2e; }

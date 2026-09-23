@@ -25,13 +25,17 @@ with, endorsed by, or sponsored by DJI or Quectel**.
 
 ## SMS design inspiration
 
-SMS AT-port detection, text-mode CMGF/CMGL/CMGS flow, and UCS2 handling for Chinese
-SMS were informed by ideas from the MIT-licensed project
-[ctexcel-sms-dji](https://github.com/ywang3129-cell/ctexcel-sms-dji)
+Earlier text-mode CMGF/CMGL/CMGS and UCS2 handling ideas were informed by the
+MIT-licensed project [ctexcel-sms-dji](https://github.com/ywang3129-cell/ctexcel-sms-dji)
 (Copyright 2026 ywang3129-cell). This toolkit ships a **slim** Electron + serialport
 implementation and does **not** copy that project's full application, Telegram bot,
-or installer. Upstream license terms continue to apply to any substantial excerpts
-if present; attribute accordingly.
+or installer.
+
+PDU-mode receive/send, status (CNUM/ICCID/IMS), and IMS enable flows in v0.3+ follow
+**common public AT/modem practice** (3GPP TS 27.005 / 23.040 style commands). macOS
+DJI 4G tools such as DJOneHub / DJ4Hub / DJIC are acknowledged as **prior art
+inspiration only**. Their PolyForm Noncommercial (or other non-MIT) source was
+**not** copied; PDU codecs and modem control here are original MIT code.
 
 ## Electron / Node dependencies
 

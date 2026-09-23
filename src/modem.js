@@ -2,36 +2,19 @@
 
 const { SerialPort } = require('serialport');
 const { AT_PORT_HINT, findAtPort, listSerialPorts } = require('./device');
+const {
+  encodeSubmitPdu,
+  parseCmglPdu,
+  parseCmgrPdu,
+  reassembleConcat,
+} = require('./pdu');
 
 const SMS_SUBMIT_TIMEOUT_MS = 60000;
 const BAUD = 115200;
+const STORAGES = ['SM', 'ME', 'MT'];
 
-const GSM_BASIC = new Set(
-  Array.from(
-    "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
-      '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
-  )
-);
-const GSM_EXT = new Set(Array.from('^{}\\[~]|€'));
-
-function isGsmText(text) {
-  for (const ch of text) {
-    if (!GSM_BASIC.has(ch) && !GSM_EXT.has(ch)) return false;
-  }
-  return true;
-}
-
-function decodeUcs2Hex(body) {
-  const compact = body.replace(/\s+/g, '');
-  if (compact && compact.length % 4 === 0 && /^[0-9A-Fa-f]+$/.test(compact)) {
-    try {
-      // Modem UCS2 is big-endian; Node utf16le needs byte-swapped buffer.
-      return Buffer.from(compact, 'hex').swap16().toString('utf16le');
-    } catch {
-      return body;
-    }
-  }
-  return body;
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function parseCsvFields(value) {
@@ -62,46 +45,9 @@ function parseCsvFields(value) {
   return result;
 }
 
-function parseCmgl(response) {
-  const messages = [];
-  const lines = response.replace(/\r/g, '').split('\n');
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i].trim();
-    const m = line.match(/^\+CMGL:\s*(.*)$/);
-    if (!m) {
-      i++;
-      continue;
-    }
-    const fields = parseCsvFields(m[1]);
-    const index = fields[0] ? parseInt(fields[0], 10) : null;
-    const status = fields[1] || '';
-    const sender = fields[2] || '';
-    const timestamp = fields[4] || '';
-    const bodyLines = [];
-    i++;
-    while (i < lines.length) {
-      const nxt = lines[i];
-      const t = nxt.trim();
-      if (t.startsWith('+CMGL:') || t === 'OK' || t === 'ERROR') break;
-      bodyLines.push(nxt);
-      i++;
-    }
-    let body = bodyLines.join('\n').replace(/^\n+|\n+$/g, '');
-    body = decodeUcs2Hex(body);
-    messages.push({
-      index: Number.isFinite(index) ? index : null,
-      status: String(status).replace(/^"|"$/g, ''),
-      sender: String(sender).replace(/^"|"$/g, ''),
-      timestamp: String(timestamp).replace(/^"|"$/g, ''),
-      body,
-    });
-  }
-  return messages;
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+function firstMatch(text, re) {
+  const m = String(text || '').match(re);
+  return m ? m[1] : null;
 }
 
 class AtModem {
@@ -111,9 +57,26 @@ class AtModem {
     this._error = null;
     this._signal = null;
     this._operator = null;
+    this._ownNumber = null;
+    this._iccid = null;
+    this._imsi = null;
+    this._csca = null;
+    this._creg = null;
+    this._cereg = null;
+    this._imsEnable = null;
+    this._imsRegistered = null;
     this._messages = [];
     this._busy = Promise.resolve();
     this._stopped = false;
+    this._rxBuf = '';
+    this._awaitingResponse = false;
+    this._cmtiQueue = [];
+    this._onUrc = null;
+    this._dataHandler = null;
+  }
+
+  setUrcHandler(fn) {
+    this._onUrc = typeof fn === 'function' ? fn : null;
   }
 
   _enqueue(fn) {
@@ -128,8 +91,17 @@ class AtModem {
       port: this._port,
       signal: this._signal,
       operator: this._operator,
+      ownNumber: this._ownNumber,
+      iccid: this._iccid,
+      imsi: this._imsi,
+      csca: this._csca,
+      creg: this._creg,
+      cereg: this._cereg,
+      imsEnable: this._imsEnable,
+      imsRegistered: this._imsRegistered,
       error: this._error,
       atHint: AT_PORT_HINT,
+      mode: 'PDU',
     };
   }
 
@@ -145,6 +117,10 @@ class AtModem {
   async _disconnect() {
     if (this._serial) {
       try {
+        if (this._dataHandler) {
+          this._serial.off('data', this._dataHandler);
+          this._dataHandler = null;
+        }
         if (this._serial.isOpen) {
           await new Promise((r) => this._serial.close(() => r()));
         }
@@ -153,6 +129,75 @@ class AtModem {
       }
     }
     this._serial = null;
+    this._rxBuf = '';
+    this._awaitingResponse = false;
+  }
+
+  _attachDataListener() {
+    if (!this._serial) return;
+    if (this._dataHandler) {
+      this._serial.off('data', this._dataHandler);
+    }
+    this._dataHandler = (chunk) => {
+      this._rxBuf += chunk.toString('utf8');
+      if (!this._awaitingResponse) {
+        this._drainUrcs();
+      }
+    };
+    this._serial.on('data', this._dataHandler);
+  }
+
+  _drainUrcs() {
+    // Pull +CMTI: lines out of the idle buffer.
+    const re = /\+CMTI:\s*"([^"]+)"\s*,\s*(\d+)/g;
+    let m;
+    const kept = this._rxBuf;
+    const found = [];
+    while ((m = re.exec(kept)) !== null) {
+      found.push({ storage: m[1], index: parseInt(m[2], 10) });
+    }
+    if (found.length) {
+      this._rxBuf = this._rxBuf.replace(/\+CMTI:\s*"[^"]+"\s*,\s*\d+\r?\n?/g, '');
+      for (const item of found) {
+        this._cmtiQueue.push(item);
+        if (this._onUrc) {
+          try {
+            this._onUrc({ type: 'CMTI', ...item });
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      // Schedule read without blocking current callers.
+      this._enqueue(() => this._handleCmtiQueue());
+    }
+  }
+
+  async _handleCmtiQueue() {
+    while (this._cmtiQueue.length && this._serial && this._serial.isOpen) {
+      const item = this._cmtiQueue.shift();
+      try {
+        await this._command(`AT+CPMS="${item.storage}","${item.storage}","${item.storage}"`);
+        const raw = await this._command(`AT+CMGR=${item.index}`, { timeout: 10000 });
+        const msg = parseCmgrPdu(raw);
+        if (msg) {
+          const entry = {
+            ...msg,
+            index: item.index,
+            storage: item.storage,
+          };
+          // Replace same storage+index or append
+          const idx = this._messages.findIndex(
+            (m) => m.storage === entry.storage && m.index === entry.index
+          );
+          if (idx >= 0) this._messages[idx] = entry;
+          else this._messages.unshift(entry);
+          this._messages = reassembleConcat(this._messages);
+        }
+      } catch (err) {
+        this._error = `CMTI 读取失败: ${err.message || err}`;
+      }
+    }
   }
 
   async _readResponse(timeoutMs, { expectPrompt = false } = {}) {
@@ -160,28 +205,41 @@ class AtModem {
       throw new Error('串口未连接');
     }
     const deadline = Date.now() + timeoutMs;
-    let buf = Buffer.alloc(0);
-    while (Date.now() < deadline && !this._stopped) {
-      const chunk = this._serial.read();
-      if (chunk && chunk.length) {
-        buf = Buffer.concat([buf, chunk]);
-        const text = buf.toString('utf8');
-        if (expectPrompt && /(?:^|\r?\n)>\s*$/.test(text)) return text;
-        if (/(?:^|\r?\n)(?:OK|ERROR|\+CMS ERROR:.*|\+CME ERROR:.*)\r?\n?$/.test(text)) {
-          return text;
+    this._awaitingResponse = true;
+    try {
+      while (Date.now() < deadline && !this._stopped) {
+        const text = this._rxBuf;
+        if (expectPrompt && /(?:^|\r?\n)>\s*$/.test(text)) {
+          const out = this._rxBuf;
+          this._rxBuf = '';
+          return out;
         }
-      } else {
+        // Complete final result line present
+        if (
+          /(?:^|\r?\n)(?:OK|ERROR|\+CMS ERROR:[^\r\n]*|\+CME ERROR:[^\r\n]*)\r?\n/.test(text) ||
+          /(?:^|\r?\n)(?:OK|ERROR|\+CMS ERROR:[^\r\n]*|\+CME ERROR:[^\r\n]*)$/.test(text.trimEnd())
+        ) {
+          const out = this._rxBuf;
+          this._rxBuf = '';
+          return out;
+        }
         await sleep(30);
       }
+      const text = this._rxBuf;
+      this._rxBuf = '';
+      throw new Error(`AT timeout: ${text.slice(0, 200)}`);
+    } finally {
+      this._awaitingResponse = false;
+      // URCs may have arrived mixed; drain leftover CMTI after response
+      this._drainUrcs();
     }
-    const text = buf.toString('utf8');
-    throw new Error(`AT timeout: ${text.slice(0, 200)}`);
   }
 
   async _command(command, { timeout = 5000, expectPrompt = false } = {}) {
     if (!this._serial || !this._serial.isOpen) {
       throw new Error('串口未连接');
     }
+    this._rxBuf = '';
     this._serial.write(`${command}\r`);
     await new Promise((resolve, reject) => {
       this._serial.drain((err) => (err ? reject(err) : resolve()));
@@ -223,27 +281,22 @@ class AtModem {
       } catch {
         /* ignore */
       }
-      const cmds = [
-        'ATE0',
-        'AT+CMGF=1',
-        'AT+CSCS="GSM"',
-        'AT+CSDH=1',
-        'AT+CPMS="SM","SM","SM"',
-        'AT+CNMI=2,1,0,0,0',
-      ];
+      this._rxBuf = '';
+      this._attachDataListener();
+
+      // PDU mode like common AT/modem SMS tools (CMGF=0 + CNMI).
+      const cmds = ['ATE0', 'AT+CMGF=0', 'AT+CNMI=2,1,0,0,0'];
       for (const cmd of cmds) {
+        await this._command(cmd);
+      }
+      // Prefer SM as primary read/write storage; fall back to ME.
+      try {
+        await this._command('AT+CPMS="SM","SM","SM"');
+      } catch {
         try {
-          await this._command(cmd);
-        } catch (exc) {
-          if (cmd.includes('CPMS')) {
-            try {
-              await this._command('AT+CPMS="ME","ME","ME"');
-            } catch {
-              /* keep going */
-            }
-          } else {
-            throw exc;
-          }
+          await this._command('AT+CPMS="ME","ME","ME"');
+        } catch {
+          /* keep going */
         }
       }
       await this._refreshLocked();
@@ -253,6 +306,83 @@ class AtModem {
       await this._disconnect();
     }
     return this.status();
+  }
+
+  async _safeQuery(cmd, parseFn, timeout = 5000) {
+    try {
+      const raw = await this._command(cmd, { timeout });
+      return parseFn(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  async _readIdentityLocked() {
+    this._ownNumber = await this._safeQuery('AT+CNUM', (raw) => {
+      // +CNUM: "", "+4474...", type
+      const m = raw.match(/\+CNUM:\s*(?:"[^"]*"\s*,\s*)?"([^"]+)"/);
+      return m ? m[1] : null;
+    });
+
+    this._iccid = await this._safeQuery('AT+QCCID', (raw) => {
+      return firstMatch(raw, /\+QCCID:\s*([0-9A-Fa-f]+)/) || firstMatch(raw, /\b(89\d{15,20})\b/);
+    });
+    if (!this._iccid) {
+      this._iccid = await this._safeQuery('AT+CCID', (raw) => {
+        return (
+          firstMatch(raw, /\+CCID:\s*"?([0-9A-Fa-f]+)"?/) ||
+          firstMatch(raw, /\b(89\d{15,20})\b/)
+        );
+      });
+    }
+
+    this._imsi = await this._safeQuery('AT+CIMI', (raw) => {
+      const m = raw.match(/(?:^|\n)\s*(\d{14,16})\s*(?:\n|$)/);
+      return m ? m[1] : null;
+    });
+
+    this._csca = await this._safeQuery('AT+CSCA?', (raw) => {
+      const m = raw.match(/\+CSCA:\s*"([^"]+)"/);
+      return m ? m[1] : null;
+    });
+
+    this._creg = await this._safeQuery('AT+CREG?', (raw) => {
+      const m = raw.match(/\+CREG:\s*(\d+)\s*,\s*(\d+)/);
+      return m ? `${m[1]},${m[2]}` : firstMatch(raw, /\+CREG:\s*([^\r\n]+)/);
+    });
+
+    this._cereg = await this._safeQuery('AT+CEREG?', (raw) => {
+      const m = raw.match(/\+CEREG:\s*(\d+)\s*,\s*(\d+)/);
+      return m ? `${m[1]},${m[2]}` : firstMatch(raw, /\+CEREG:\s*([^\r\n]+)/);
+    });
+
+    await this._readImsLocked();
+  }
+
+  async _readImsLocked() {
+    const ims = await this._safeQuery('AT+QCFG="ims"', (raw) => {
+      // +QCFG: "ims",<enable>,<registered>
+      const m = raw.match(/\+QCFG:\s*"ims"\s*,\s*(\d+)\s*,\s*(\d+)/i);
+      if (m) return { enable: parseInt(m[1], 10), registered: parseInt(m[2], 10) };
+      const m2 = raw.match(/\+QCFG:\s*"ims"\s*,\s*(\d+)/i);
+      if (m2) return { enable: parseInt(m2[1], 10), registered: null };
+      return null;
+    });
+    if (ims) {
+      this._imsEnable = ims.enable;
+      this._imsRegistered = ims.registered;
+    } else {
+      this._imsEnable = null;
+      this._imsRegistered = null;
+    }
+  }
+
+  async _listPduStorage(storage) {
+    await this._command(`AT+CPMS="${storage}","${storage}","${storage}"`);
+    const raw = await this._command('AT+CMGL=4', { timeout: 20000 });
+    const msgs = parseCmglPdu(raw);
+    for (const m of msgs) m.storage = storage;
+    return msgs;
   }
 
   async _refreshLocked() {
@@ -270,12 +400,25 @@ class AtModem {
     } catch {
       this._operator = null;
     }
-    try {
-      const raw = await this._command('AT+CMGL="ALL"', { timeout: 15000 });
-      this._messages = parseCmgl(raw);
-    } catch (err) {
-      this._error = `读取短信失败: ${err.message || err}`;
+
+    await this._readIdentityLocked();
+
+    const all = [];
+    const seen = new Set();
+    for (const storage of STORAGES) {
+      try {
+        const msgs = await this._listPduStorage(storage);
+        for (const msg of msgs) {
+          const key = `${msg.storage}:${msg.index}:${msg.pdu || msg.body}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          all.push(msg);
+        }
+      } catch {
+        // storage may be unsupported — skip
+      }
     }
+    this._messages = reassembleConcat(all);
   }
 
   refresh() {
@@ -288,7 +431,7 @@ class AtModem {
       }
       try {
         await this._refreshLocked();
-        if (this._error && !String(this._error).includes('读取短信')) {
+        if (this._error && !String(this._error).includes('读取')) {
           this._error = null;
         }
       } catch (err) {
@@ -296,6 +439,37 @@ class AtModem {
       }
       return { status: this.status(), messages: this.messages() };
     });
+  }
+
+  enableIms({ reboot = false } = {}) {
+    return this._enqueue(() => this._enableImsLocked(reboot));
+  }
+
+  async _enableImsLocked(reboot) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    await this._command('AT+QCFG="ims",1');
+    await this._readImsLocked();
+    let rebooting = false;
+    if (reboot) {
+      rebooting = true;
+      try {
+        // Soft reboot; port will drop.
+        this._serial.write('AT+CFUN=1,1\r');
+        await new Promise((resolve, reject) => {
+          this._serial.drain((err) => (err ? reject(err) : resolve()));
+        });
+      } catch {
+        /* ignore */
+      }
+      await sleep(500);
+      await this._disconnect();
+      this._error = '已发送软重启 (AT+CFUN=1,1)，请等待模组重新枚举后点「重新连接」';
+    }
+    return {
+      status: this.status(),
+      messages: this.messages(),
+      rebooting,
+    };
   }
 
   send(recipient, text) {
@@ -308,53 +482,26 @@ class AtModem {
     if (!recipient || !text) throw new Error('号码和内容不能为空');
     if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
 
-    const useUcs2 = !isGsmText(text);
-    let switched = false;
-    try {
-      let encTo;
-      let payload;
-      if (useUcs2) {
-        await this._command('AT+CSCS="UCS2"');
-        await this._command('AT+CSMP=17,167,0,8');
-        switched = true;
-        encTo = Buffer.from(recipient, 'utf16le').swap16().toString('hex').toUpperCase();
-        payload = Buffer.from(
-          Buffer.from(text, 'utf16le').swap16().toString('hex').toUpperCase(),
-          'ascii'
-        );
-      } else {
-        encTo = recipient;
-        payload = Buffer.from(text, 'ascii');
-      }
-      await this._command(`AT+CMGS="${encTo}"`, { timeout: 5000, expectPrompt: true });
-      this._serial.write(Buffer.concat([payload, Buffer.from([0x1a])]));
-      await new Promise((resolve, reject) => {
-        this._serial.drain((err) => (err ? reject(err) : resolve()));
-      });
-      const response = await this._readResponse(SMS_SUBMIT_TIMEOUT_MS);
-      if (/(?:^|\r?\n)(?:ERROR|\+CMS ERROR:|\+CME ERROR:)/.test(response)) {
-        throw new Error(response.trim().slice(0, 300));
-      }
-      if (!/\+CMGS:\s*\d+/.test(response)) {
-        throw new Error('未收到 +CMGS 确认');
-      }
-      return { ok: true };
-    } finally {
-      if (switched && this._serial && this._serial.isOpen) {
-        try {
-          await this._command('AT+CSCS="GSM"');
-          await this._command('AT+CSMP=17,167,0,0');
-        } catch {
-          /* ignore */
-        }
-      }
+    // Prefer PDU submit (parity with macOS AT tools); clean 3GPP encoding.
+    const { pduHex, tpduLen } = encodeSubmitPdu(recipient, text);
+    await this._command('AT+CMGF=0');
+    await this._command(`AT+CMGS=${tpduLen}`, { timeout: 5000, expectPrompt: true });
+    this._serial.write(Buffer.from(`${pduHex}\x1a`, 'ascii'));
+    await new Promise((resolve, reject) => {
+      this._serial.drain((err) => (err ? reject(err) : resolve()));
+    });
+    const response = await this._readResponse(SMS_SUBMIT_TIMEOUT_MS);
+    if (/(?:^|\r?\n)(?:ERROR|\+CMS ERROR:|\+CME ERROR:)/.test(response)) {
+      throw new Error(response.trim().slice(0, 300));
     }
+    if (!/\+CMGS:\s*\d+/.test(response)) {
+      throw new Error('未收到 +CMGS 确认');
+    }
+    return { ok: true };
   }
 }
 
 module.exports = {
   AtModem,
-  parseCmgl,
-  isGsmText,
-  decodeUcs2Hex,
+  parseCsvFields,
 };
