@@ -12,7 +12,7 @@
 
 1. **Electron 桌面应用**：左侧导航（概览 / 短信 / 驱动 / 诊断）+ 浅色默认主题（可切换深色并持久化）
 2. **捆绑 Quectel NDIS Windows USB Driver (Q) V2.6.0** 的 `windows10/` INF+SYS，管理员一键 `pnputil` 安装 `qcser` / `qcmdm` / `qcfilter`（默认**不**安装 `qcwwan`）
-3. **短信（PDU）**：`AT+CMGF=0` + `AT+CNMI=2,1,0,0,0`；`AT+CMGL=4` 遍历 SM/ME/MT；自研 MIT 清洁实现的 SMS-DELIVER PDU 解码（发件人 / 时间戳 / GSM7·UCS2，基础长短信拼接）；PDU `CMGS` 发送；监听 `+CMTI:` 刷新对应索引。**默认不自动删除**短信
+3. **短信（PDU）**：`AT+CMGF=0` + `AT+CNMI=2,1,0,0,0`；`AT+CMGL=4` 遍历 SM/ME/MT；自研 MIT 清洁实现的 SMS-DELIVER PDU 解码（发件人 / 时间戳 / GSM7·UCS2，基础长短信拼接）；PDU `CMGS` 发送（含 MR）；CMS 失败时可回退文本模式；监听 `+CMTI:` 刷新对应索引；支持单条删除与确认后清空 SM。**默认不自动删除**短信
 4. **概览状态板**：运营商、信号、网络、SIM/号码、IMS、端口、ICCID（缩短显示）、注册状态
 5. **启用 IMS**：一键 `AT+QCFG="ims",1`，可选两步软重启 `AT+CFUN=1,1`
 
@@ -30,8 +30,8 @@
 
 1. 维护者推送版本标签，例如：
    ```bash
-   git tag v0.4.0
-   git push origin v0.4.0
+   git tag v0.4.1
+   git push origin v0.4.1
    ```
 2. Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在 `windows-latest` 上用 **Node + electron-builder** 打出 Windows 安装包 / 便携版，并创建 GitHub Release
 3. 用户到仓库 **Releases** 页下载，校验 SHA256 后运行

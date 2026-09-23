@@ -85,6 +85,37 @@ ipcMain.handle('sms:send', async (_evt, payload) => {
   }
 });
 
+ipcMain.handle('sms:delete', async (_evt, payload) => {
+  try {
+    const result = await modem.deleteMessage({
+      storage: payload?.storage,
+      index: payload?.index,
+    });
+    return { ok: true, ...result };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      status: modem.status(),
+      messages: modem.messages(),
+    };
+  }
+});
+
+ipcMain.handle('sms:deleteAll', async (_evt, payload) => {
+  try {
+    const result = await modem.deleteAll({ storage: payload?.storage });
+    return { ok: true, ...result };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      status: modem.status(),
+      messages: modem.messages(),
+    };
+  }
+});
+
 ipcMain.handle('sms:enableIms', async (_evt, payload) => {
   try {
     const result = await modem.enableIms({ reboot: !!(payload && payload.reboot) });

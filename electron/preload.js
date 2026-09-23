@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('toolkit', {
   smsReconnect: () => ipcRenderer.invoke('sms:reconnect'),
   smsRefresh: () => ipcRenderer.invoke('sms:refresh'),
   smsSend: (to, text) => ipcRenderer.invoke('sms:send', { to, text }),
+  smsDelete: (storage, index) => ipcRenderer.invoke('sms:delete', { storage, index }),
+  smsDeleteAll: (storage) => ipcRenderer.invoke('sms:deleteAll', { storage }),
   smsEnableIms: (reboot) => ipcRenderer.invoke('sms:enableIms', { reboot: !!reboot }),
   onSmsUrc: (handler) => {
     const listener = (_evt, payload) => handler(payload);

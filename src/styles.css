@@ -502,7 +502,7 @@ input:focus {
 
 .msg {
   display: grid;
-  grid-template-columns: minmax(140px, 200px) 1fr;
+  grid-template-columns: minmax(140px, 200px) 1fr auto;
   gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line-2);
@@ -535,6 +535,39 @@ input:focus {
   font-size: 13px;
 }
 
+.msg-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn.tiny {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.btn.danger-ghost,
+.danger-ghost {
+  color: #b91c1c;
+  border-color: color-mix(in srgb, #b91c1c 35%, var(--line));
+}
+
+.btn.danger-ghost:hover,
+.danger-ghost:hover {
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+}
+
+.panel-head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 280px;
+}
+
+
 /* —— Responsive —— */
 @media (max-width: 980px) {
   .shell { grid-template-columns: 72px 1fr; }
@@ -548,6 +581,8 @@ input:focus {
   .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compose-row { grid-template-columns: 1fr; }
   .msg { grid-template-columns: 1fr; gap: 6px; }
+  .msg-actions { justify-content: flex-start; }
+  .panel-head-right { align-items: stretch; max-width: none; }
   .content, .topbar { padding-left: 16px; padding-right: 16px; }
 }
 

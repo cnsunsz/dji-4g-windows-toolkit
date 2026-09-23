@@ -90,6 +90,12 @@ function encodeAddress(number) {
   if (n.startsWith('+')) {
     type = 0x91;
     n = n.slice(1);
+  } else {
+    const digitsOnly = n.replace(/\D/g, '');
+    // 86########## without + → international (TON/NPI 0x91)
+    if (/^86\d{10,}$/.test(digitsOnly)) {
+      type = 0x91;
+    }
   }
   n = n.replace(/\D/g, '');
   const { digits, buf } = encodeSemiOctets(n);
@@ -315,7 +321,13 @@ function encodeSubmitPdu(recipient, text, { statusReport = false } = {}) {
   }
 
   const vp = Buffer.from([0xaa]); // relative VP ~ 4 days (common default)
-  const tpdu = Buffer.concat([Buffer.from([fo]), da, pid, dcs, vp, udl, ud]);
+  // 3GPP TS 23.040 SMS-SUBMIT: FO + MR + DA + PID + DCS + VP + UDL + UD
+  const mr = Buffer.from([0x00]);
+  const tpdu = Buffer.concat([Buffer.from([fo]), mr, da, pid, dcs, vp, udl, ud]);
+  // Self-check: FO then MR; CMGS length must include the MR octet.
+  if (tpdu[0] !== fo || tpdu[1] !== 0x00) {
+    throw new Error('SMS-SUBMIT TPDU layout error (expected FO,MR)');
+  }
   const pdu = Buffer.concat([sca, tpdu]);
   return { pduHex: bufToHex(pdu), tpduLen: tpdu.length };
 }
@@ -475,6 +487,7 @@ function canEncodeGsm7(text) {
 module.exports = {
   decodeDeliverPdu,
   encodeSubmitPdu,
+  encodeAddress,
   parseCmglPdu,
   parseCmgrPdu,
   reassembleConcat,

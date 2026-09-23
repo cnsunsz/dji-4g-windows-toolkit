@@ -103,7 +103,10 @@
                 <p class="kicker">INBOX</p>
                 <h2>收件箱（PDU）</h2>
               </div>
-              <p class="panel-note">约每 15 秒自动刷新；列表为空多为网络/IMS/SIM 未投递</p>
+              <div class="panel-head-right">
+                <p class="panel-note">约每 15 秒自动刷新；不会在读取时自动删除</p>
+                <button type="button" class="btn ghost danger-ghost" id="btnSmsClearSm">清空当前存储 (SM)</button>
+              </div>
             </div>
             <div id="smsList" class="inbox" aria-live="polite"></div>
           </div>

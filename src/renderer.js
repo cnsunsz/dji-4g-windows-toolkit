@@ -22,6 +22,7 @@ function setBusy(isBusy) {
     'btnSmsRefresh',
     'btnSmsReconnect',
     'btnSend',
+    'btnSmsClearSm',
     'btnEnableIms',
     'btnEnableImsReboot',
   ]) {
@@ -213,9 +214,41 @@ function renderMessages(msgs) {
     body.className = 'msg-body';
     body.textContent = m.body || '';
 
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn tiny danger-ghost';
+    delBtn.textContent = '删除';
+    delBtn.title = '从模组存储删除此条';
+    delBtn.disabled = m.index == null || m.index === '';
+    delBtn.addEventListener('click', () => deleteOneMessage(m));
+    actions.appendChild(delBtn);
+
     row.appendChild(side);
     row.appendChild(body);
+    row.appendChild(actions);
     box.appendChild(row);
+  }
+}
+
+async function deleteOneMessage(m) {
+  if (!m || m.index == null || m.index === '') return;
+  const ok = window.confirm(
+    `确定删除此短信？\n发件人: ${m.sender || '?'}\n索引: #${m.index} · 存储: ${m.storage || 'SM'}\n\n不会自动删除；仅在确认后执行 AT+CMGD。`
+  );
+  if (!ok) return;
+  setBusy(true);
+  setSmsStatus('正在删除…');
+  try {
+    const result = await window.toolkit.smsDelete(m.storage || 'SM', m.index);
+    if (!result.ok) throw new Error(result.error || '删除失败');
+    setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
+    renderMessages(result.messages || []);
+  } catch (e) {
+    setSmsStatus('删除失败: ' + (e.message || e), false);
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -350,6 +383,25 @@ async function init() {
       );
     } catch (e) {
       setSmsStatus('启用 IMS/重启失败: ' + (e.message || e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  $('btnSmsClearSm').onclick = async () => {
+    const ok = window.confirm(
+      '将清空当前存储 SM 中的全部短信（AT+CMGD=1,4）。\n此操作不可恢复。是否继续？'
+    );
+    if (!ok) return;
+    setBusy(true);
+    setSmsStatus('正在清空 SM…');
+    try {
+      const result = await window.toolkit.smsDeleteAll('SM');
+      if (!result.ok) throw new Error(result.error || '清空失败');
+      setSmsStatus(result.status || {}, !!(result.status && result.status.connected && !result.status.error));
+      renderMessages(result.messages || []);
+    } catch (e) {
+      setSmsStatus('清空失败: ' + (e.message || e), false);
     } finally {
       setBusy(false);
     }

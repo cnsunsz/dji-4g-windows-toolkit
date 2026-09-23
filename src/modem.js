@@ -7,6 +7,7 @@ const {
   parseCmglPdu,
   parseCmgrPdu,
   reassembleConcat,
+  canEncodeGsm7,
 } = require('./pdu');
 
 const SMS_SUBMIT_TIMEOUT_MS = 60000;
@@ -476,13 +477,7 @@ class AtModem {
     return this._enqueue(() => this._sendLocked(recipient, text));
   }
 
-  async _sendLocked(recipient, text) {
-    recipient = String(recipient || '').trim();
-    text = String(text || '');
-    if (!recipient || !text) throw new Error('号码和内容不能为空');
-    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
-
-    // Prefer PDU submit (parity with macOS AT tools); clean 3GPP encoding.
+  async _sendPduOnce(recipient, text) {
     const { pduHex, tpduLen } = encodeSubmitPdu(recipient, text);
     await this._command('AT+CMGF=0');
     await this._command(`AT+CMGS=${tpduLen}`, { timeout: 5000, expectPrompt: true });
@@ -492,12 +487,131 @@ class AtModem {
     });
     const response = await this._readResponse(SMS_SUBMIT_TIMEOUT_MS);
     if (/(?:^|\r?\n)(?:ERROR|\+CMS ERROR:|\+CME ERROR:)/.test(response)) {
-      throw new Error(response.trim().slice(0, 300));
+      const errText = response.trim().slice(0, 300);
+      const err = new Error(errText);
+      err.cms = /\+CMS ERROR:/i.test(errText);
+      err.raw = errText;
+      throw err;
     }
     if (!/\+CMGS:\s*\d+/.test(response)) {
       throw new Error('未收到 +CMGS 确认');
     }
-    return { ok: true };
+    return { ok: true, mode: 'PDU' };
+  }
+
+  async _sendTextFallback(recipient, text) {
+    const useUcs2 = !canEncodeGsm7(text);
+    let switched = false;
+    try {
+      await this._command('AT+CMGF=1');
+      let encTo;
+      let payload;
+      if (useUcs2) {
+        await this._command('AT+CSCS="UCS2"');
+        await this._command('AT+CSMP=17,167,0,8');
+        switched = true;
+        encTo = Buffer.from(recipient, 'utf16le').swap16().toString('hex').toUpperCase();
+        payload = Buffer.from(
+          Buffer.from(text, 'utf16le').swap16().toString('hex').toUpperCase(),
+          'ascii'
+        );
+      } else {
+        try {
+          await this._command('AT+CSCS="GSM"');
+        } catch {
+          /* keep current CSCS */
+        }
+        encTo = recipient;
+        payload = Buffer.from(text, 'ascii');
+      }
+      await this._command(`AT+CMGS="${encTo}"`, { timeout: 5000, expectPrompt: true });
+      this._serial.write(Buffer.concat([payload, Buffer.from([0x1a])]));
+      await new Promise((resolve, reject) => {
+        this._serial.drain((err) => (err ? reject(err) : resolve()));
+      });
+      const response = await this._readResponse(SMS_SUBMIT_TIMEOUT_MS);
+      if (/(?:^|\r?\n)(?:ERROR|\+CMS ERROR:|\+CME ERROR:)/.test(response)) {
+        throw new Error(response.trim().slice(0, 300));
+      }
+      if (!/\+CMGS:\s*\d+/.test(response)) {
+        throw new Error('未收到 +CMGS 确认（文本模式）');
+      }
+      return { ok: true, mode: 'TEXT' };
+    } finally {
+      if (switched && this._serial && this._serial.isOpen) {
+        try {
+          await this._command('AT+CSCS="GSM"');
+          await this._command('AT+CSMP=17,167,0,0');
+        } catch {
+          /* ignore */
+        }
+      }
+      if (this._serial && this._serial.isOpen) {
+        try {
+          await this._command('AT+CMGF=0');
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  async _sendLocked(recipient, text) {
+    recipient = String(recipient || '').trim();
+    text = String(text || '');
+    if (!recipient || !text) throw new Error('号码和内容不能为空');
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+
+    try {
+      return await this._sendPduOnce(recipient, text);
+    } catch (err) {
+      const msg = String(err.message || err);
+      const isCms = err.cms || /\+CMS ERROR:/i.test(msg);
+      if (!isCms) throw err;
+      try {
+        return await this._sendTextFallback(recipient, text);
+      } catch (fallbackErr) {
+        throw new Error(
+          `PDU 发送失败（${msg.slice(0, 120)}）；文本模式回退也失败：${String(fallbackErr.message || fallbackErr).slice(0, 200)}`
+        );
+      }
+    }
+  }
+
+  deleteMessage({ storage, index } = {}) {
+    return this._enqueue(() => this._deleteMessageLocked(storage, index));
+  }
+
+  async _deleteMessageLocked(storage, index) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const stor = String(storage || 'SM').toUpperCase();
+    // Reassembled concat may use "1+2+3" index string.
+    const indexes = String(index ?? '')
+      .split('+')
+      .map((s) => s.trim())
+      .filter((s) => /^\d+$/.test(s))
+      .map((s) => parseInt(s, 10));
+    if (!indexes.length) throw new Error('无效的短信索引');
+    await this._command(`AT+CPMS="${stor}","${stor}","${stor}"`);
+    for (const idx of indexes) {
+      await this._command(`AT+CMGD=${idx}`, { timeout: 10000 });
+    }
+    await this._refreshLocked();
+    return { ok: true, status: this.status(), messages: this.messages() };
+  }
+
+  deleteAll({ storage } = {}) {
+    return this._enqueue(() => this._deleteAllLocked(storage));
+  }
+
+  async _deleteAllLocked(storage) {
+    if (!this._serial || !this._serial.isOpen) throw new Error('设备未连接');
+    const stor = String(storage || 'SM').toUpperCase();
+    // AT+CMGD=<index>,4 — delflag 4 deletes all messages in current storage
+    await this._command(`AT+CPMS="${stor}","${stor}","${stor}"`);
+    await this._command('AT+CMGD=1,4', { timeout: 30000 });
+    await this._refreshLocked();
+    return { ok: true, status: this.status(), messages: this.messages() };
   }
 }
 
