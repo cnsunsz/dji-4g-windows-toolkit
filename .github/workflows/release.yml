@@ -55,8 +55,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release-out | Out-Null
           $files = @()
-          Get-ChildItem -Path dist -File -Recurse | Where-Object {
-            $_.Extension -in @('.exe', '.msi') -and $_.Name -notmatch 'uninstall'
+          # Only top-level dist EXEs (portable + NSIS), not win-unpacked/elevate.exe
+          Get-ChildItem -Path dist -File | Where-Object {
+            $_.Extension -eq '.exe' -and $_.Name -like 'DJI-4G-Windows-Toolkit*'
           } | ForEach-Object {
             $dest = Join-Path "release-out" $_.Name
             Copy-Item $_.FullName $dest -Force
